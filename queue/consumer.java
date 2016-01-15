@@ -10,9 +10,9 @@ public class test_receive {
 	  public static void main(String[] argv) throws Exception {
 	    ConnectionFactory factory = new ConnectionFactory();
 	    factory.setHost("localhost");
-	    factory.setPort(portnumber);
-	    factory.setUsername("username");
-	    factory.setPassword("password");
+	    factory.setPort(5672);
+	    factory.setUsername("guest");
+	    factory.setPassword("guest");
 	    final Connection connection = factory.newConnection();
 	    final Channel channel = connection.createChannel();
 
