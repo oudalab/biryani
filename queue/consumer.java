@@ -1,4 +1,4 @@
-mport java.io.IOException;
+import java.io.IOException;
 
 import com.rabbitmq.client.*;
 
