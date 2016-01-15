@@ -3,7 +3,7 @@ import java.io.IOException;
 import com.rabbitmq.client.*;
 
 
-public class test_receive {
+public class consumer {
 	
 	private static final String TASK_QUEUE_NAME = "main_queue";
 
