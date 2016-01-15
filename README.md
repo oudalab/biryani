@@ -21,7 +21,7 @@ This the configuration file needed for the python module.
 
 A Dockerfile which builds a corenlp container
 
-#cCorenlp/corenlp.json
+# corenlp/corenlp.json
 
 Configuration file which specifies how the output of the corenlp container to be processed
 
