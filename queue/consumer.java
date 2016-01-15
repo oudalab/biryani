@@ -9,10 +9,10 @@ public class consumer {
 
 	  public static void main(String[] argv) throws Exception {
 	    ConnectionFactory factory = new ConnectionFactory();
-	    factory.setHost("localhost");
-	    //factory.setPort(5672);
-	    //factory.setUsername("guest");
-	    //factory.setPassword("guest");
+	    factory.setHost("rabbitmq server ip address");
+	    factory.setPort(portnumber);
+	    factory.setUsername("username");
+	    factory.setPassword("password");
 	    final Connection connection = factory.newConnection();
 	    final Channel channel = connection.createChannel();
 
