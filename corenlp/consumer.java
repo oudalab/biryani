@@ -70,8 +70,8 @@ public class consumer {
           }
 
           private static void doWork(String task) {
-
-                 System.out.println("messages received\t"+count++);
+			
+                 System.out.println("messages received\t"+ ++count);
           }
 
 }
