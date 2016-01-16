@@ -1,20 +1,20 @@
 {
         "rabbitmq": {
-                "ip":"localhost",
-                "port":"port number",
-                "vhost":"/",
-                "username":"username",
-                "password":"password",
-                "queue":"queue name",
-                "durable":"1",
-                "persistent":1 },
-
-        "mongodb": {
-                "ip":"localhost",
-                "port":"27017",
+                "ip":"",
+                "port":"",
+                "vhost":"",
                 "username":"",
                 "password":"",
-                "db":"database name" }
+                "queue":"",
+                "durable":"",
+                "persistent":"" },
+
+        "mongodb": {
+                "ip":"",
+                "port":"",
+                "username":"",
+                "password":"",
+                "db":"" }
 
 
 }
