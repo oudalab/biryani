@@ -5,7 +5,11 @@ RUN wget -qO- -O tmp.zip http://nlp.stanford.edu/software/stanford-corenlp-full-
      wget https://www.rabbitmq.com/releases/rabbitmq-java-client/v3.6.0/rabbitmq-java-client-bin-3.6.0.zip && \
      unzip -o rabbitmq-java-client-bin-3.6.0.zip && \
      wget https://json-simple.googlecode.com/files/json-simple-1.1.1.jar  && \
-     mkdir -p lib && mv json-simple-1.1.1.jar  lib && mv stanford-corenlp-full-2015-12-09/*jar lib && mv rabbitmq-java-client-bin-3.6.0/*jar lib 
+     wget https://repo1.maven.org/maven2/com/google/guava/guava/19.0/guava-19.0.jar && \ 
+     mkdir -p lib && mv json-simple-1.1.1.jar lib && \
+     mv guava-19.0.jar  lib && \
+     mv stanford-corenlp-full-2015-12-09/*jar lib && \
+     mv rabbitmq-java-client-bin-3.6.0/*jar lib 
 CMD javac -cp "lib/*" consumer.java && \
      java -cp ".:lib/*" consumer
 
