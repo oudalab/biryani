@@ -40,6 +40,23 @@ public class consumer {
 	}
 	public static void main(String[] argv) throws Exception {
 		// Read the configuration file of corenlp
+		final int num_proc ;
+		final int num_docs;
+		if (argv.length==1)
+		{
+			num_proc=Integer.parseInt(argv[0]);
+			num_docs=1;
+		}
+		else if(argv.length==2)
+		{
+			num_proc=Integer.parseInt(argv[0]);
+			num_docs=Integer.parseInt(argv[1]);
+		}
+		else
+		{
+			num_proc=1;
+			num_docs=1;
+		}
 		String R_ip = "";
 		int R_port = 0;
 		String R_usr = "";
@@ -47,7 +64,8 @@ public class consumer {
 		String R_vhost = "";
 		String R_queue = "";
 		try {
-			FileReader reader = new FileReader("corenlp.json");
+			FileReader reader = new FileReader(
+					"corenlp.json");
 			JSONObject jsonobject = (JSONObject) new JSONParser().parse(reader);
 			JSONObject rabbit = (JSONObject) jsonobject.get("rabbitmq");
 			//JSONObject mongo = (JSONObject) jsonobject.get("mongodb");
@@ -83,7 +101,7 @@ public class consumer {
 					// System.out.println(" [x] Received  messages'");
 					try 
 					{ 
-						doWork(message);
+						doWork(message,num_proc,num_docs);
 					} catch (ParseException e) 
 					{
 					// TODO Auto-generated catch block
@@ -105,7 +123,7 @@ public class consumer {
 			
 		}
 	}
-	private static void doWork(String input) throws ParseException {
+	private static void doWork(String input,int num_proc,int num_docs) throws ParseException {
 		JSONObject json = (JSONObject) instance.parser.parse(input);
 		//PrintWriter out = new PrintWriter(System.out);
 		String doc_id= (String)json.get("doc_id");
@@ -115,18 +133,22 @@ public class consumer {
 		Annotation annotation = new Annotation(article_body);
 		annotation.set(CoreAnnotations.DocIDAnnotation.class, doc_id);
 		instance.annotate_list.add(annotation);
-		if(instance.annotate_list.size()>=5)
+		if(instance.annotate_list.size()>=num_docs)
 		{
-			instance.pipeline.annotate(instance.annotate_list, 4, new Consumer<Annotation>() {
+			final int size=instance.annotate_list.size();
+			System.out.println("Number of threads: "+num_proc);
+			instance.pipeline.annotate(instance.annotate_list,num_proc , new Consumer<Annotation>() {
 
 				public void accept(Annotation arg0) 
 				{
+					
 					//System.out.println("---------PROCESSING PARSED TREE FOR DOCUMENT---------");
 					String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
 					//System.out.println("DOC_ID:: "+doc_id);
 					List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
 					for(CoreMap sentence: sentences) 
 					{
+						
 						for (CoreLabel token: sentence.get(TokensAnnotation.class)) 
 						{
 							String word = token.get(TextAnnotation.class);
@@ -134,17 +156,18 @@ public class consumer {
 							String ne = token.get(NamedEntityTagAnnotation.class);
 						}
 						Tree tree = sentence.get(TreeAnnotation.class);
-						System.out.println(sentence+"\n"+tree);
+						//System.out.println(sentence+"\n"+tree);
 						//SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
 						//System.out.println(dependencies);
 					}
-					System.out.println("---------PARSED---------");
-					 
+					System.out.println("processd:"+sentences.size());
 				}
 			});
 			System.out.println(instance.pipeline.timingInformation());
 			//instance.pipeline.prettyPrint(annotation, out);
 			instance.annotate_list.clear();	 
+			StanfordCoreNLP.clearAnnotatorPool();
 		}
 	}
 }
+

@@ -10,6 +10,6 @@ RUN wget -qO- -O tmp.zip http://nlp.stanford.edu/software/stanford-corenlp-full-
      mv guava-19.0.jar  lib && \
      mv stanford-corenlp-full-2015-12-09/*jar lib && \
      mv rabbitmq-java-client-bin-3.6.0/*jar lib 
-CMD javac -cp "lib/*" consumer.java && \
-     java -cp ".:lib/*" consumer
+RUN     javac -cp "lib/*" consumer.java 
+CMD  javac -cp "lib/*" consumer.java && java -cp ".:lib/*" consumer
 
