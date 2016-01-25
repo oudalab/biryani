@@ -32,9 +32,8 @@ public class consumer {
 	static {
 		instance = new consumer();
 		Properties props = new Properties();
-		props.put("annotators", "tokenize, ssplit,parse");
-		props.put("parse.mode",
-				"edu/stanford/nlp/models/srparser/englishSR.ser.gz");
+		props.put("annotators", "tokenize, ssplit,pos,parse");
+		props.put("parse.model","edu/stanford/nlp/models/srparser/englishSR.ser.gz");
 
 		instance.pipeline = new StanfordCoreNLP(props);
 	}
@@ -64,8 +63,7 @@ public class consumer {
 		String R_vhost = "";
 		String R_queue = "";
 		try {
-			FileReader reader = new FileReader(
-					"corenlp.json");
+			FileReader reader = new FileReader("corenlp.json");
 			JSONObject jsonobject = (JSONObject) new JSONParser().parse(reader);
 			JSONObject rabbit = (JSONObject) jsonobject.get("rabbitmq");
 			//JSONObject mongo = (JSONObject) jsonobject.get("mongodb");
@@ -136,7 +134,7 @@ public class consumer {
 		if(instance.annotate_list.size()>=num_docs)
 		{
 			final int size=instance.annotate_list.size();
-			System.out.println("Number of threads: "+num_proc);
+			//System.out.println("Number of threads: "+num_proc);
 			instance.pipeline.annotate(instance.annotate_list,num_proc , new Consumer<Annotation>() {
 
 				public void accept(Annotation arg0) 
@@ -163,7 +161,7 @@ public class consumer {
 					System.out.println("processd:"+sentences.size());
 				}
 			});
-			System.out.println(instance.pipeline.timingInformation());
+			//System.out.println(instance.pipeline.timingInformation());
 			//instance.pipeline.prettyPrint(annotation, out);
 			instance.annotate_list.clear();	 
 			StanfordCoreNLP.clearAnnotatorPool();
