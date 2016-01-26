@@ -1,17 +1,23 @@
 # biryani
 
-Download the local copy of the biryani repo.
-Go to the folder corenlp and run the following command.
+<h1> Installing </h1>
 
-<h3>docker build -t image-name . </h3> 
-Note: There is a period after image-name, which specifies that Docker file is in current directory
-<br>
-Example: docker build -t phani\ccnlp:1.0 .
+Step 1: 
+  Install docker.
 
-To run the image created
-
-<h3>docker run image-name java -cp ".:lib/*" consumer #threads #documents </h3>
-Example: docker run phani\ccnlp:1.0 java -cp ".:lib/*" consumer 16 200
+Step 2:
+  Download the local copy of the biryani repo.
+  Go to the folder corenlp and run the following command.
+  ```
+  docker build -t image-name . 
+  ```
+  Note: There is a period after image-name, which specifies that Docker file is in current directory
+  Example: ``` docker build -t phani\ccnlp:1.0 . ```
+  
+Step 3:
+  To run the image created
+  <h3>docker run image-name java -cp ".:lib/*" consumer #threads #documents </h3>
+  Example: docker run phani\ccnlp:1.0 java -cp ".:lib/*" consumer 16 200
 
 # queue/queue_producer_consumer.py
 A python module contining two functions producer and consumer. Each function reads the configuration file and executes accordingly.  
