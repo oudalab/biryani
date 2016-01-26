@@ -8,15 +8,19 @@ Step 1:
 Step 2:
   Download the local copy of the biryani repo.
   Go to the folder corenlp and run the following command.
-  ```
-  docker build -t image-name . 
-  ```
-  Note: There is a period after image-name, which specifies that Docker file is in current directory
+  ```docker build -t image-name . ```
+  <br>
+  Note: There is a period after image-name, which specifies that Docker file is in current directory. 
+  <br>
   Example: ``` docker build -t phani\ccnlp:1.0 . ```
   
 Step 3:
   To run the image created
-  <h3>docker run image-name java -cp ".:lib/*" consumer #threads #documents </h3>
+  ```
+  docker run image-name java -cp ".:lib/*" consumer #threads #documents 
+  ```
+  <br>
+  Note: Be careful with the image name you give. If the image is not present, docker searches for the image in the dockerhub and if there an image it would download the image and run the for you. 
   Example: docker run phani\ccnlp:1.0 java -cp ".:lib/*" consumer 16 200
 
 # queue/queue_producer_consumer.py
