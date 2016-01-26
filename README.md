@@ -18,7 +18,7 @@
 <b>Step 3:</b>
   To run the image created
   
-  ```docker run image-name java -cp ".:lib/*" consumer #threads #documents ```
+  ```docker run image-name java -cp ".:lib/*" consumer #threads #documents(batch size) ```
   
   <i>Note:</i> Be careful with the image name you give. If the image is not present, docker searches for the image in the dockerhub and if there an image it would download the image and run the for you.
   
