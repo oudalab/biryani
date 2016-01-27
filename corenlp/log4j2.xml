@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+    <Appenders>
+        <Socket name="JTest" host="localHost" port="56448">
+            <SerializedLayout ></SerializedLayout>
+        </Socket>
+    </Appenders>
+    <Loggers>
+        <Root level="debug">
+            <AppenderRef ref="JTest"/>
+        </Root>
+    </Loggers>
+</Configuration>
