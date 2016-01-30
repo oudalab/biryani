@@ -150,12 +150,12 @@ public class consumer {
 		int mb=1024*1024;
 	 Runtime instance=Runtime.getRuntime();
 
-    System.out.println("Total Memory:"+instance.totalMemory() / mb);
-    System.out.println("Free Memory:"+instance.freeMemory() / mb);
-    System.out.println("Used Memory:"+(instance.totalMemory()-instance.freeMemory())/mb);
-    System.out.println("Max Memory: "+instance.maxMemory()/mb);
+    instance.log.debug("Total Memory:"+instance.totalMemory() / mb);
+    instance.log.debug("Free Memory:"+instance.freeMemory() / mb);
+    instance.log.debug("Used Memory:"+(instance.totalMemory()-instance.freeMemory())/mb);
+    instance.log.debug("Max Memory: "+instance.maxMemory()/mb);
     
-    var freeMemory=instance.freeMemory/mb;
+    String freeMemory=instance.freeMemory()/mb;
     if(freeMemory<10)
     {
     	try {
@@ -177,7 +177,7 @@ public class consumer {
 			bw.write("the free memory is logged here when it exited: "+freeMemory);
 			bw.close();
 
-			System.out.println("Done");
+			
 
 		} catch (IOException e) {
 			e.printStackTrace();
