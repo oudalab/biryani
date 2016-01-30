@@ -29,7 +29,7 @@ import edu.stanford.nlp.util.CoreMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.UUID;
-import java.time.LocalDateTime
+import java.time.LocalDateTime;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
