@@ -1,6 +1,6 @@
 FROM java:8
 ADD . /
-RUN wget -qO- -O tmp.zip http://nlp.stanford.edu/software/stanford-corenlp-full-2015-12-09.zip && \
+RUN  wget -qO- -O tmp.zip http://nlp.stanford.edu/software/stanford-corenlp-full-2015-12-09.zip && \
      unzip -o tmp.zip && \
      wget http://nlp.stanford.edu/software/stanford-srparser-2014-10-23-models.jar && \
      wget https://www.rabbitmq.com/releases/rabbitmq-java-client/v3.6.0/rabbitmq-java-client-bin-3.6.0.zip && \
