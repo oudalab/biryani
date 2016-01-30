@@ -100,10 +100,10 @@ public class consumer {
 	            	int mb=1024*1024;
 		        Runtime instanceRuntime=Runtime.getRuntime();
 
-	            instance.log.debug(log_token+" Total Memory:"+instanceRuntime.totalMemory() / mb);
+	            /*instance.log.debug(log_token+" Total Memory:"+instanceRuntime.totalMemory() / mb);
 	            instance.log.debug(log_token+" Free Memory:"+instanceRuntime.freeMemory() / mb);
 			    instance.log.debug(log_token+" Used Memory:"+(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb);
-			    instance.log.debug(log_token+" Max Memory: "+instanceRuntime.maxMemory()/mb);
+			    instance.log.debug(log_token+" Max Memory: "+instanceRuntime.maxMemory()/mb);*/
 			    
 			    double freeMemory=instanceRuntime.freeMemory()/mb*1.0;
 			    double usedMemory=(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb*1.0;
@@ -111,10 +111,10 @@ public class consumer {
 			    {*/
 			    	try {
 			            String timeStamp =LocalDateTime.now().toString();
-			            String uuid = UUID.randomUUID().toString();
+			            //String uuid = UUID.randomUUID().toString();
 					
 			            //in case it can not write the same file at the same time
-						File file = new File("/home/"+log_token+"_"+uuid+".log");
+						File file = new File("/home/"+log_token+"_"+".log");
 
 						// if file doesnt exists, then create it
 						if (!file.exists()) {
@@ -124,8 +124,8 @@ public class consumer {
 						FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
 						BufferedWriter bw = new BufferedWriter(fw);
 
-						bw.write("the exit time is logged here: "+timeStamp);
-						bw.write("the free memory is logged here when it exited: "+freeMemory);
+						bw.write("the exit time is logged here: "+timeStamp+"/n");
+						bw.write("current free memory: "+freeMemory+"/n");
 						bw.close();
 
 					} catch (IOException e) {
