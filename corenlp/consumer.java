@@ -29,7 +29,11 @@ import edu.stanford.nlp.util.CoreMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.UUID;
-
+import java.text.DateFormat;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 
 
 public class consumer {
@@ -177,7 +181,7 @@ public class consumer {
 			bw.write("the free memory is logged here when it exited: "+freeMemory);
 			bw.close();
 
-		} catch (Exception e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		//if so close this container:
