@@ -28,6 +28,8 @@ import edu.stanford.nlp.util.CoreMap;
 
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.UUID;
+
 
 
 public class consumer {
@@ -157,17 +159,18 @@ public class consumer {
     if(freeMemory<10)
     {
     	try {
-            string content=LocalDateTime.now();
+            String content=LocalDateTime.now().toString();
+            String uuid = UUID.randomUUID().toString();
 		
-
-			File file = new File("../f"+log_token+".log");
+            //in case it can not write the same file at the same time
+			File file = new File("../f"+log_token+"_"+uuid".log");
 
 			// if file doesnt exists, then create it
 			if (!file.exists()) {
 				file.createNewFile();
 			}
-
-			FileWriter fw = new FileWriter(file.getAbsoluteFile());
+            //he true will make sure it is being append
+			FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
 			BufferedWriter bw = new BufferedWriter(fw);
 
 			bw.write("the exit time is logged here: "+content);
