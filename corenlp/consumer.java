@@ -214,9 +214,9 @@ public class consumer {
 						bw.write("the dead error is here"+e.getStackTrace().toString());
 						bw.close();
 
-					} catch (IOException e) {
+					} catch (IOException e1) {
 						System.out.println("this is error for logging the memory leakage: ");
-						e.printStackTrace();
+						e1.printStackTrace();
 					}
 
 					} 	
@@ -227,9 +227,9 @@ public class consumer {
 				}
 			};
 			channel.basicConsume(R_queue, false, consumer_rabbimq);
-		}catch(ConnectException e)
+		}catch(ConnectException e2)
 		{
-			e.printStackTrace();
+			e2.printStackTrace();
 			instance.log.error("Cannot connect to server, network error!");
 		}
 		finally
