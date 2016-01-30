@@ -100,21 +100,21 @@ public class consumer {
 	            	int mb=1024*1024;
 		        Runtime instanceRuntime=Runtime.getRuntime();
 
-	            instance.log.debug("Total Memory:"+instanceRuntime.totalMemory() / mb);
-	            instance.log.debug("Free Memory:"+instanceRuntime.freeMemory() / mb);
-			    instance.log.debug("Used Memory:"+(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb);
-			    instance.log.debug("Max Memory: "+instanceRuntime.maxMemory()/mb);
+	            instance.log.debug(log_token+" Total Memory:"+instanceRuntime.totalMemory() / mb);
+	            instance.log.debug(log_token+" Free Memory:"+instanceRuntime.freeMemory() / mb);
+			    instance.log.debug(log_token+" Used Memory:"+(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb);
+			    instance.log.debug(log_token+" Max Memory: "+instanceRuntime.maxMemory()/mb);
 			    
 			    double freeMemory=instanceRuntime.freeMemory()/mb*1.0;
 			    double usedMemory=(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb*1.0;
-			    if(freeMemory<10)
-			    {
+			    /*if(freeMemory<10)
+			    {*/
 			    	try {
 			            String timeStamp =LocalDateTime.now().toString();
 			            String uuid = UUID.randomUUID().toString();
 					
 			            //in case it can not write the same file at the same time
-						File file = new File(log_token+"_"+uuid+".log");
+						File file = new File("/home/"+log_token+"_"+uuid+".log");
 
 						// if file doesnt exists, then create it
 						if (!file.exists()) {
@@ -129,15 +129,16 @@ public class consumer {
 						bw.close();
 
 					} catch (IOException e) {
+						System.out.println("this is error for logging the memory leakage: ");
 						e.printStackTrace();
 					}
 					//if so close this container:
 					
 			    }
 			    //kill this thread when the java engine not run any more
-			    else if(usedMemory<5)
+			   /* else if(usedMemory<5)
 			    	{return;
-			    	}
+			    	}*/
             }
             
             } 
@@ -147,8 +148,9 @@ public class consumer {
             }
           }  
         };
-
+         //start the monitor thread here.
         monitorThread.start();
+
 		try {
 			FileReader reader = new FileReader("corenlp.json");
 			JSONObject jsonobject = (JSONObject) new JSONParser().parse(reader);
@@ -175,7 +177,7 @@ public class consumer {
 			final Connection connection = factory.newConnection();
 			final Channel channel = connection.createChannel();
 			channel.queueDeclare(R_queue, true, false, false, null);
-			channel.basicQos(1);
+			channel.basicQos(500);
 			DefaultConsumer consumer_rabbimq = new DefaultConsumer(channel) 
 			{
 				@Override
@@ -187,10 +189,36 @@ public class consumer {
 					try 
 					{ 
 						doWork(message,num_proc,num_docs,log_token);
-					} catch (ParseException e) 
+					}
+					//exit error may not be a parser exception 
+					catch (Exception e) 
 					{
 					// TODO Auto-generated catch block
-					e.printStackTrace();
+					//e.printStackTrace();
+						try {
+			            String timeStamp =LocalDateTime.now().toString();
+			            String uuid = UUID.randomUUID().toString();
+					
+			            //in case it can not write the same file at the same time
+						File file = new File("/home/"+log_token+"_"+uuid+".log");
+
+						// if file doesnt exists, then create it
+						if (!file.exists()) {
+							file.createNewFile();
+						}
+			            //he true will make sure it is being append
+						FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
+						BufferedWriter bw = new BufferedWriter(fw);
+
+						bw.write("the exit time is logged here: "+timeStamp);
+						bw.write("the dead error is here"+e.getStackTrace().toString());
+						bw.close();
+
+					} catch (IOException e) {
+						System.out.println("this is error for logging the memory leakage: ");
+						e.printStackTrace();
+					}
+
 					} 	
 					finally 
 					{ 
