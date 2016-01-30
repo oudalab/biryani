@@ -29,7 +29,7 @@ import edu.stanford.nlp.util.CoreMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.UUID;
-import java.text.DateFormat;
+import java.time.LocalDateTime
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -163,7 +163,7 @@ public class consumer {
     if(freeMemory<10)
     {
     	try {
-            String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new java.util.Date());
+            String timeStamp =LocalDateTime.now().toString();
             String uuid = UUID.randomUUID().toString();
 		
             //in case it can not write the same file at the same time
