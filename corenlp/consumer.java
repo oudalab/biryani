@@ -148,14 +148,14 @@ public class consumer {
 	private static void doWork(String input,int num_proc,int num_docs,String log_token) throws ParseException {
 		//inside of each dowork check the momory availability
 		int mb=1024*1024;
-	 Runtime instance=Runtime.getRuntime();
+	 Runtime instance1=Runtime.getRuntime();
 
-    instance.log.debug("Total Memory:"+instance.totalMemory() / mb);
-    instance.log.debug("Free Memory:"+instance.freeMemory() / mb);
-    instance.log.debug("Used Memory:"+(instance.totalMemory()-instance.freeMemory())/mb);
-    instance.log.debug("Max Memory: "+instance.maxMemory()/mb);
+    instance.log.debug("Total Memory:"+instance1.totalMemory() / mb);
+    instance.log.debug("Free Memory:"+instance1.freeMemory() / mb);
+    instance.log.debug("Used Memory:"+(instance1.totalMemory()-instance.freeMemory())/mb);
+    instance.log.debug("Max Memory: "+instance1.maxMemory()/mb);
     
-    String freeMemory=instance.freeMemory()/mb;
+    String freeMemory=instance1.freeMemory()/mb;
     if(freeMemory<10)
     {
     	try {
