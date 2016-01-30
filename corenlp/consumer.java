@@ -34,6 +34,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.*;
 
 
 public class consumer {
@@ -89,6 +90,65 @@ public class consumer {
 		String R_pass = "";
 		String R_vhost = "";
 		String R_queue = "";
+
+		monitorThread= new Thread() {
+        public void run() {
+        try {
+           while(true)
+            //sleep 10 secs then check memory;
+	            {Thread.sleep(10000);
+	            	int mb=1024*1024;
+		        Runtime instanceRuntime=Runtime.getRuntime();
+
+	            instance.log.debug("Total Memory:"+instanceRuntime.totalMemory() / mb);
+	            instance.log.debug("Free Memory:"+instanceRuntime.freeMemory() / mb);
+			    instance.log.debug("Used Memory:"+(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb);
+			    instance.log.debug("Max Memory: "+instanceRuntime.maxMemory()/mb);
+			    
+			    double freeMemory=instanceRuntime.freeMemory()/mb*1.0;
+			    double usedMemory=instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb*1.0;
+			    if(freeMemory<10)
+			    {
+			    	try {
+			            String timeStamp =LocalDateTime.now().toString();
+			            String uuid = UUID.randomUUID().toString();
+					
+			            //in case it can not write the same file at the same time
+						File file = new File(log_token+"_"+uuid+".log");
+
+						// if file doesnt exists, then create it
+						if (!file.exists()) {
+							file.createNewFile();
+						}
+			            //he true will make sure it is being append
+						FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
+						BufferedWriter bw = new BufferedWriter(fw);
+
+						bw.write("the exit time is logged here: "+timeStamp);
+						bw.write("the free memory is logged here when it exited: "+freeMemory);
+						bw.close();
+
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					//if so close this container:
+					
+			    }
+			    //kill this thread when the java engine not run any more
+			    else(usedMemory<5)
+			    	{return;
+			    	}
+            }
+            
+            } 
+        catch(InterruptedException v) 
+            {
+            System.out.println(v);
+            }
+          }  
+        };
+
+        monitorThread.start();
 		try {
 			FileReader reader = new FileReader("corenlp.json");
 			JSONObject jsonobject = (JSONObject) new JSONParser().parse(reader);
@@ -151,42 +211,7 @@ public class consumer {
 	}
 	private static void doWork(String input,int num_proc,int num_docs,String log_token) throws ParseException {
 		//inside of each dowork check the momory availability
-		int mb=1024*1024;
-	 Runtime instanceRuntime=Runtime.getRuntime();
-
-    instance.log.debug("Total Memory:"+instanceRuntime.totalMemory() / mb);
-    instance.log.debug("Free Memory:"+instanceRuntime.freeMemory() / mb);
-    instance.log.debug("Used Memory:"+(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb);
-    instance.log.debug("Max Memory: "+instanceRuntime.maxMemory()/mb);
-    
-    double freeMemory=instanceRuntime.freeMemory()/mb*1.0;
-    if(freeMemory<10)
-    {
-    	try {
-            String timeStamp =LocalDateTime.now().toString();
-            String uuid = UUID.randomUUID().toString();
 		
-            //in case it can not write the same file at the same time
-			File file = new File(log_token+"_"+uuid+".log");
-
-			// if file doesnt exists, then create it
-			if (!file.exists()) {
-				file.createNewFile();
-			}
-            //he true will make sure it is being append
-			FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
-			BufferedWriter bw = new BufferedWriter(fw);
-
-			bw.write("the exit time is logged here: "+timeStamp);
-			bw.write("the free memory is logged here when it exited: "+freeMemory);
-			bw.close();
-
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		//if so close this container:
-		return;
-    }
 		JSONObject json = (JSONObject) instance.parser.parse(input);
 		//PrintWriter out = new PrintWriter(System.out);
 		String doc_id= (String)json.get("doc_id");
