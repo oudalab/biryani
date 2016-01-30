@@ -163,7 +163,7 @@ public class consumer {
             String uuid = UUID.randomUUID().toString();
 		
             //in case it can not write the same file at the same time
-			File file = new File("../f"+log_token+"_"+uuid".log");
+			File file = new File(log_token+"_"+uuid+".log");
 
 			// if file doesnt exists, then create it
 			if (!file.exists()) {
