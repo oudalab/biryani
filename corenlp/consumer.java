@@ -124,8 +124,8 @@ public class consumer {
 						FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
 						BufferedWriter bw = new BufferedWriter(fw);
 
-						bw.write("the exit time is logged here: "+timeStamp+"/n");
-						bw.write("current free memory: "+freeMemory+"/n");
+						bw.write("time: "+timeStamp+'\n');
+						bw.write("free memory: "+freeMemory+'\n');
 						bw.close();
 
 					} catch (IOException e) {
