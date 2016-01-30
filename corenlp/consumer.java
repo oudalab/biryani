@@ -179,7 +179,7 @@ public class consumer {
 
 			
 
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		//if so close this container:
