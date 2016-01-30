@@ -91,7 +91,7 @@ public class consumer {
 		String R_vhost = "";
 		String R_queue = "";
 
-		monitorThread= new Thread() {
+		Thread monitorThread= new Thread() {
         public void run() {
         try {
            while(true)
