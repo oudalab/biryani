@@ -40,6 +40,44 @@ public class consumer {
 	private Stopwatch batch_timer;
 	private Stopwatch total_timer;
 	private Stopwatch parse_timer;
+	int mb=1024*1024;
+	 Runtime instance=Runtime.getRuntime();
+
+    System.out.println("Total Memory:"+instance.totalMemory() / mb);
+    System.out.println("Free Memory:"+instance.freeMemory() / mb);
+    System.out.println("Used Memory:"+(instance.totalMemory()-instance.freeMemory())/mb);
+    System.out.println("Max Memory: "+instance.maxMemory()/mb);
+    
+    var freeMemory=instance.freeMemory/mb;
+    if(freeMemory<10)
+    {
+    	try {
+            string content=LocalDateTime.now();
+		
+
+			File file = new File("../f"+log_token+".log");
+
+			// if file doesnt exists, then create it
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+
+			FileWriter fw = new FileWriter(file.getAbsoluteFile());
+			BufferedWriter bw = new BufferedWriter(fw);
+
+			bw.write("the exit time is logged here: "+content);
+			bw.write("the free memory is logged here when it exited: "+freeMemory);
+			bw.close();
+
+			System.out.println("Done");
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		//if so close this container:
+		return;
+    }
+
 	//private Logger log = Logger.getLogger(consumer.class.getName());
 	private Logger log = Logger.getLogger("log4j.properties");
 	
