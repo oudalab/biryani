@@ -148,18 +148,18 @@ public class consumer {
 	private static void doWork(String input,int num_proc,int num_docs,String log_token) throws ParseException {
 		//inside of each dowork check the momory availability
 		int mb=1024*1024;
-	 Runtime instance1=Runtime.getRuntime();
+	 Runtime instanceRuntime=Runtime.getRuntime();
 
-    instance.log.debug("Total Memory:"+instance1.totalMemory() / mb);
-    instance.log.debug("Free Memory:"+instance1.freeMemory() / mb);
-    instance.log.debug("Used Memory:"+(instance1.totalMemory()-instance.freeMemory())/mb);
-    instance.log.debug("Max Memory: "+instance1.maxMemory()/mb);
+    instance.log.debug("Total Memory:"+instanceRuntime.totalMemory() / mb);
+    instance.log.debug("Free Memory:"+instanceRuntime.freeMemory() / mb);
+    instance.log.debug("Used Memory:"+(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb);
+    instance.log.debug("Max Memory: "+instanceRuntime.maxMemory()/mb);
     
-    String freeMemory=instance1.freeMemory()/mb;
+    double freeMemory=instanceRuntime.freeMemory()/mb*1.0;
     if(freeMemory<10)
     {
     	try {
-            String content=LocalDateTime.now().toString();
+            String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new java.util.Date());
             String uuid = UUID.randomUUID().toString();
 		
             //in case it can not write the same file at the same time
@@ -173,11 +173,9 @@ public class consumer {
 			FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
 			BufferedWriter bw = new BufferedWriter(fw);
 
-			bw.write("the exit time is logged here: "+content);
+			bw.write("the exit time is logged here: "+timeStamp);
 			bw.write("the free memory is logged here when it exited: "+freeMemory);
 			bw.close();
-
-			
 
 		} catch (Exception e) {
 			e.printStackTrace();
