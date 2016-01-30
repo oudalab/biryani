@@ -106,7 +106,7 @@ public class consumer {
 			    instance.log.debug("Max Memory: "+instanceRuntime.maxMemory()/mb);
 			    
 			    double freeMemory=instanceRuntime.freeMemory()/mb*1.0;
-			    double usedMemory=instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb*1.0;
+			    double usedMemory=(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb*1.0;
 			    if(freeMemory<10)
 			    {
 			    	try {
@@ -135,7 +135,7 @@ public class consumer {
 					
 			    }
 			    //kill this thread when the java engine not run any more
-			    else(usedMemory<5)
+			    else if(usedMemory<5)
 			    	{return;
 			    	}
             }
