@@ -134,7 +134,7 @@ public class consumer {
 					}
 					//if so close this container:
 					
-			    }
+			    //}
 			    //kill this thread when the java engine not run any more
 			   /* else if(usedMemory<5)
 			    	{return;
