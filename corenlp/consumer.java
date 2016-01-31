@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.UUID;
 import java.time.LocalDateTime;
+import java.io.PrintStream;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -43,7 +44,8 @@ public class consumer {
 	private static final consumer instance;
 	private StanfordCoreNLP pipeline = null;
 	private JSONParser parser = new JSONParser();
-    private BlockingQueue<Annotation> queue;
+	//need to find a way to change this 500.
+    private ArrayBlockingQueue<Annotation> queue=new ArrayBlockingQueue<Annotation>(500);
 	//private ArrayList<Annotation> annotate_list= new ArrayList<Annotation>();
 	
 	private Stopwatch doc_timer;
@@ -93,7 +95,7 @@ public class consumer {
 		String R_pass = "";
 		String R_vhost = "";
 		String R_queue = "";
-		instance.queue=new ArrayBlockingQueue<Annotation>(num_docs);
+		//instance.queue=new ArrayBlockingQueue<Annotation>(num_docs);
 
 		Thread monitorThread= new Thread() {
         public void run() {
@@ -190,7 +192,7 @@ public class consumer {
 				public void handleDelivery(String consumerTag, Envelope envelope,
 						AMQP.BasicProperties properties, byte[] body) throws IOException 
 				{
-					ackCcount=ackCount+1;
+					ackCount=ackCount+1;
 					String message = new String(body, "UTF-8");
 					// System.out.println(" [x] Received  messages'");
 					try 
