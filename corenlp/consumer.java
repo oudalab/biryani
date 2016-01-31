@@ -185,7 +185,7 @@ public class consumer {
 			DefaultConsumer consumer_rabbimq = new DefaultConsumer(channel) 
 			{
 				//create this varaible to do batch acknowledgement
-				int ackCount=0
+				int ackCount=0;
 				@Override
 				public void handleDelivery(String consumerTag, Envelope envelope,
 						AMQP.BasicProperties properties, byte[] body) throws IOException 
@@ -217,7 +217,7 @@ public class consumer {
 						FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
 						
 						PrintStream ps=new PrintStream(file);
-						e.printStackTrace(ps)
+						e.printStackTrace(ps);
 						ps.close();
 
 					} catch (IOException e1) {
@@ -266,7 +266,7 @@ public class consumer {
 		{
 			//System.out.println("Number of threads: "+num_proc);
 			//System.out.println("parse time:"+instance.parse_timer);
-            private ArrayList<Annotation> tempArraylist= new ArrayList<Annotation>();
+            ArrayList<Annotation> tempArraylist= new ArrayList<Annotation>();
 			queue.drainTo(tempArraylist);
 			//now the queue is unblocking
 			queue.clear();
