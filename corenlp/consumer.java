@@ -42,7 +42,9 @@ public class consumer {
 	private static final consumer instance;
 	private StanfordCoreNLP pipeline = null;
 	private JSONParser parser = new JSONParser();
-	private ArrayList<Annotation> annotate_list= new ArrayList<Annotation>();
+    private BlockingQueue<Annotation> queue;
+	//private ArrayList<Annotation> annotate_list= new ArrayList<Annotation>();
+	
 	private Stopwatch doc_timer;
 	private Stopwatch batch_timer;
 	private Stopwatch total_timer;
@@ -90,6 +92,7 @@ public class consumer {
 		String R_pass = "";
 		String R_vhost = "";
 		String R_queue = "";
+		instance.queue=new ArrayBlockingQueue<Annotation>(num_docs);
 
 		Thread monitorThread= new Thread() {
         public void run() {
@@ -177,13 +180,16 @@ public class consumer {
 			final Connection connection = factory.newConnection();
 			final Channel channel = connection.createChannel();
 			channel.queueDeclare(R_queue, true, false, false, null);
-			channel.basicQos(500);
+			channel.basicQos(2*num_docs);
 			DefaultConsumer consumer_rabbimq = new DefaultConsumer(channel) 
 			{
+				//create this varaible to do batch acknowledgement
+				int ackCount=0
 				@Override
 				public void handleDelivery(String consumerTag, Envelope envelope,
 						AMQP.BasicProperties properties, byte[] body) throws IOException 
 				{
+					ackCcount=ackCount+1;
 					String message = new String(body, "UTF-8");
 					// System.out.println(" [x] Received  messages'");
 					try 
@@ -197,10 +203,10 @@ public class consumer {
 					//e.printStackTrace();
 						try {
 			            String timeStamp =LocalDateTime.now().toString();
-			            String uuid = UUID.randomUUID().toString();
+			            //String uuid = UUID.randomUUID().toString();
 					
 			            //in case it can not write the same file at the same time
-						File file = new File("/home/"+log_token+"_"+uuid+".log");
+						File file = new File("/home/"+log_token+"_"+".exitlog");
 
 						// if file doesnt exists, then create it
 						if (!file.exists()) {
@@ -208,11 +214,10 @@ public class consumer {
 						}
 			            //he true will make sure it is being append
 						FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
-						BufferedWriter bw = new BufferedWriter(fw);
-
-						bw.write("the exit time is logged here: "+timeStamp);
-						bw.write("the dead error is here"+e.getStackTrace().toString());
-						bw.close();
+						
+						PrintStream ps=new PrintStream(file);
+						e.printStackTrace(ps)
+						ps.close();
 
 					} catch (IOException e1) {
 						System.out.println("this is error for logging the memory leakage: ");
@@ -221,8 +226,12 @@ public class consumer {
 
 					} 	
 					finally 
-					{ 
-						channel.basicAck(envelope.getDeliveryTag(), false);
+					{ //set the multiple acknoledge to be true, and only ackownledge every 500 docs
+						//ToDo: need a way to ackowledge only when the 500 docs finish parsing, make it more durable.
+						if(ackCount%num_docs==0)
+						{
+						channel.basicAck(envelope.getDeliveryTag(), true);
+					   }
 					}
 				}
 			};
@@ -237,9 +246,10 @@ public class consumer {
 			
 		}
 	}
-	private static void doWork(String input,int num_proc,int num_docs,String log_token) throws ParseException {
+	private static void doWork(String input,int num_proc,int num_docs,String log_token) throws Exception {
 		//inside of each dowork check the momory availability
 		
+		//instance.rawdata_list.add(input);
 		JSONObject json = (JSONObject) instance.parser.parse(input);
 		//PrintWriter out = new PrintWriter(System.out);
 		String doc_id= (String)json.get("doc_id");
@@ -248,13 +258,19 @@ public class consumer {
 		//System.out.println(article_body);
 		Annotation annotation = new Annotation(article_body);
 		annotation.set(CoreAnnotations.DocIDAnnotation.class, doc_id);
-		instance.annotate_list.add(annotation);
-		if(instance.annotate_list.size()>=num_docs || instance.parse_timer.elapsed(TimeUnit.SECONDS)>=60000)
+		//instance.annotate_list.add(annotation);
+		instance.queue.put(annotation);
+		//set this to check if it is 0;
+		if(instance.queue.remainingCapacity()==0 || instance.parse_timer.elapsed(TimeUnit.SECONDS)>=60000)
 		{
-			
 			//System.out.println("Number of threads: "+num_proc);
 			//System.out.println("parse time:"+instance.parse_timer);
-			instance.pipeline.annotate(instance.annotate_list,num_proc , new Consumer<Annotation>() {
+            private ArrayList<Annotation> tempArraylist= new ArrayList<Annotation>();
+			queue.drainTo(tempArraylist);
+			//now the queue is unblocking
+			queue.clear();
+
+			instance.pipeline.annotate(tempArraylist,num_proc , new Consumer<Annotation>() {
 
 				public void accept(Annotation arg0) 
 				{
@@ -291,7 +307,7 @@ public class consumer {
 			//System.out.println("Total time:"+instance.total_timer);
 			instance.parse_timer.reset();
 			instance.parse_timer.start();
-			instance.annotate_list.clear();	 
+			tempArraylist.clear();	 
 			StanfordCoreNLP.clearAnnotatorPool();
 		}
 	}
