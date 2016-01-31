@@ -45,7 +45,7 @@ public class consumer {
 	private StanfordCoreNLP pipeline = null;
 	private JSONParser parser = new JSONParser();
 	//need to find a way to change this 500.
-    private ArrayBlockingQueue<Annotation> queue=new ArrayBlockingQueue<Annotation>(500);
+    private ArrayBlockingQueue<Annotation> queue;
 	//private ArrayList<Annotation> annotate_list= new ArrayList<Annotation>();
 	
 	private Stopwatch doc_timer;
@@ -95,7 +95,7 @@ public class consumer {
 		String R_pass = "";
 		String R_vhost = "";
 		String R_queue = "";
-		//instance.queue=new ArrayBlockingQueue<Annotation>(num_docs);
+		instance.queue=new ArrayBlockingQueue<Annotation>(num_docs);
 
 		Thread monitorThread= new Thread() {
         public void run() {
@@ -269,9 +269,9 @@ public class consumer {
 			//System.out.println("Number of threads: "+num_proc);
 			//System.out.println("parse time:"+instance.parse_timer);
             ArrayList<Annotation> tempArraylist= new ArrayList<Annotation>();
-			queue.drainTo(tempArraylist);
+			instance.queue.drainTo(tempArraylist);
 			//now the queue is unblocking
-			queue.clear();
+			instance.queue.clear();
 
 			instance.pipeline.annotate(tempArraylist,num_proc , new Consumer<Annotation>() {
 
