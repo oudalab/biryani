@@ -4,9 +4,10 @@ import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import org.apache.log4j.Logger;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
+import com.google.common.base.Stopwatch;
 import com.rabbitmq.client.*;
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreAnnotations.NamedEntityTagAnnotation;
@@ -20,49 +21,141 @@ import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-
-public class consumer {
+import java.time.LocalDateTime;
+import java.io.PrintStream;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+public class consumer 
+{
 
 	private static final consumer instance;
 	private StanfordCoreNLP pipeline = null;
 	private JSONParser parser = new JSONParser();
-	private ArrayList<Annotation> annotate_list= new ArrayList<Annotation>();
-	
-	static {
+	//need to find a way to change this 500.
+    private ArrayBlockingQueue<Annotation> queue;
+	private Stopwatch batch_timer;
+	private Stopwatch total_timer;
+	private Stopwatch idle_timer;
+	private Logger log = Logger.getLogger("log4j.properties");
+	private int docs_parsed;
+	static 
+	{
 		instance = new consumer();
 		Properties props = new Properties();
 		props.put("annotators", "tokenize, ssplit,pos,parse");
 		props.put("parse.model","edu/stanford/nlp/models/srparser/englishSR.ser.gz");
-
 		instance.pipeline = new StanfordCoreNLP(props);
+		instance.batch_timer= Stopwatch.createUnstarted();
+		instance.total_timer=Stopwatch.createStarted();
+		instance.idle_timer=Stopwatch.createStarted();
+		instance.docs_parsed=0;
+		
 	}
-	public static void main(String[] argv) throws Exception {
-		// Read the configuration file of corenlp
+	public static void main(String[] argv) throws Exception 
+	{
 		final int num_proc ;
 		final int num_docs;
+		final String log_token;
 		if (argv.length==1)
 		{
 			num_proc=Integer.parseInt(argv[0]);
 			num_docs=1;
+			log_token="test";
+			
 		}
 		else if(argv.length==2)
 		{
 			num_proc=Integer.parseInt(argv[0]);
 			num_docs=Integer.parseInt(argv[1]);
+			log_token="test";
+		}
+		else if(argv.length==3)
+		{
+			num_proc=Integer.parseInt(argv[0]);
+			num_docs=Integer.parseInt(argv[1]);
+			log_token=argv[2];
+			
 		}
 		else
 		{
 			num_proc=1;
 			num_docs=1;
+			log_token="test";
 		}
+		System.out.println("Num of docs:"+num_docs);
+		System.out.println("Number of threads"+num_proc);
 		String R_ip = "";
 		int R_port = 0;
 		String R_usr = "";
 		String R_pass = "";
 		String R_vhost = "";
 		String R_queue = "";
-		try {
+		instance.queue=new ArrayBlockingQueue<Annotation>(num_docs);
+
+		Thread monitorThread= new Thread() {
+        public void run() {
+        try {
+           while(true)
+            //sleep 10 secs then check memory;
+	            {Thread.sleep(10000);
+	            	int mb=1024*1024;
+		        Runtime instanceRuntime=Runtime.getRuntime();
+
+	            /*instance.log.debug(log_token+" Total Memory:"+instanceRuntime.totalMemory() / mb);
+	            instance.log.debug(log_token+" Free Memory:"+instanceRuntime.freeMemory() / mb);
+			    instance.log.debug(log_token+" Used Memory:"+(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb);
+			    instance.log.debug(log_token+" Max Memory: "+instanceRuntime.maxMemory()/mb);*/
+			    
+			    double freeMemory=instanceRuntime.freeMemory()/mb*1.0;
+			    double usedMemory=(instanceRuntime.totalMemory()-instanceRuntime.freeMemory())/mb*1.0;
+			    /*if(freeMemory<10)
+			    {*/
+			    	try {
+			            String timeStamp =LocalDateTime.now().toString();
+			            //in case it can not write the same file at the same time
+						File file = new File(log_token+"_"+".log");
+
+						// if file doesnt exists, then create it
+						if (!file.exists()) {
+							file.createNewFile();
+						}
+			            //he true will make sure it is being append
+						FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
+						BufferedWriter bw = new BufferedWriter(fw);
+
+						bw.write("time: "+timeStamp+'\n');
+						bw.write("free memory: "+freeMemory+'\n');
+						bw.close();
+
+					} catch (IOException e) {
+						System.out.println("this is error for logging the memory leakage: ");
+						e.printStackTrace();
+					}
+					//if so close this container:
+					
+			    //}
+			    //kill this thread when the java engine not run any more
+			   /* else if(usedMemory<5)
+			    	{return;
+			    	}*/
+            }
+            
+            } 
+        catch(InterruptedException v) 
+            {
+            System.out.println(v);
+            }
+          }  
+        };
+         //start the monitor thread here.
+        monitorThread.start();
+
+		try 
+		{
 			FileReader reader = new FileReader("corenlp.json");
 			JSONObject jsonobject = (JSONObject) new JSONParser().parse(reader);
 			JSONObject rabbit = (JSONObject) jsonobject.get("rabbitmq");
@@ -73,7 +166,9 @@ public class consumer {
 			R_pass = (String) rabbit.get("password");
 			R_vhost = (String) rabbit.get("vhost");
 			R_queue = (String) rabbit.get("queue");
-		} catch (Exception e) {
+		} 
+		catch (Exception e) 
+		{
 			e.printStackTrace();
 		}
 		// RabbitMQ code
@@ -88,84 +183,116 @@ public class consumer {
 			final Connection connection = factory.newConnection();
 			final Channel channel = connection.createChannel();
 			channel.queueDeclare(R_queue, true, false, false, null);
-			channel.basicQos(1);
+			channel.basicQos(2*num_docs);
 			DefaultConsumer consumer_rabbimq = new DefaultConsumer(channel) 
 			{
+				//create this varaible to do batch acknowledgement
+				int ackCount=0;
 				@Override
 				public void handleDelivery(String consumerTag, Envelope envelope,
 						AMQP.BasicProperties properties, byte[] body) throws IOException 
 				{
+					ackCount=ackCount+1;
 					String message = new String(body, "UTF-8");
 					// System.out.println(" [x] Received  messages'");
 					try 
 					{ 
-						doWork(message,num_proc,num_docs);
-					} catch (ParseException e) 
+						doWork(message,num_proc,num_docs,log_token);
+					}
+					//exit error may not be a parser exception 
+					catch (Exception e) 
 					{
 					// TODO Auto-generated catch block
-					e.printStackTrace();
+					//e.printStackTrace();
+						try 
+						{
+			            //in case it can not write the same file at the same time
+						File file = new File(log_token+"_"+".exitlog");
+
+						// if file doesnt exists, then create it
+						if (!file.exists()) {
+							file.createNewFile();
+						}
+			            //he true will make sure it is being append
+						FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
+						
+						PrintStream ps=new PrintStream(file);
+						e.printStackTrace(ps);
+						ps.close();
+
+					} catch (IOException e1) {
+						System.out.println("this is error for logging the memory leakage: ");
+						e1.printStackTrace();
+					}
+
 					} 	
 					finally 
-					{ 
-						channel.basicAck(envelope.getDeliveryTag(), false);
+					{ //set the multiple acknoledge to be true, and only ackownledge every 500 docs
+						//ToDo: need a way to ackowledge only when the 500 docs finish parsing, make it more durable.
+						if(ackCount%num_docs==0)
+						{
+						channel.basicAck(envelope.getDeliveryTag(), true);
+					   }
 					}
 				}
 			};
 			channel.basicConsume(R_queue, false, consumer_rabbimq);
-		}catch(ConnectException e)
+		}catch(ConnectException e2)
 		{
-			e.printStackTrace();
+			e2.printStackTrace();
+			instance.log.error("Cannot connect to server, network error!");
 		}
 		finally
 		{
 			
 		}
 	}
-	private static void doWork(String input,int num_proc,int num_docs) throws ParseException {
+	private static void doWork(String input,int num_proc,int num_docs,String log_token) throws Exception {
 		JSONObject json = (JSONObject) instance.parser.parse(input);
-		//PrintWriter out = new PrintWriter(System.out);
 		String doc_id= (String)json.get("doc_id");
-		//System.out.println(doc_id);
 		String article_body=(String) json.get("article_body");
-		//System.out.println(article_body);
 		Annotation annotation = new Annotation(article_body);
 		annotation.set(CoreAnnotations.DocIDAnnotation.class, doc_id);
-		instance.annotate_list.add(annotation);
-		if(instance.annotate_list.size()>=num_docs)
+		instance.queue.put(annotation);
+		//set this to check if it is 0;
+		//
+		if(instance.queue.remainingCapacity()==0 || instance.idle_timer.elapsed(TimeUnit.MILLISECONDS)>=60000)
 		{
-			final int size=instance.annotate_list.size();
-			//System.out.println("Number of threads: "+num_proc);
-			instance.pipeline.annotate(instance.annotate_list,num_proc , new Consumer<Annotation>() {
+			instance.batch_timer.start();
+            ArrayList<Annotation> tempArraylist= new ArrayList<Annotation>();
+			instance.queue.drainTo(tempArraylist);
+			instance.queue.clear();
+			if(tempArraylist.size()>0)
+			{
+				instance.pipeline.annotate(tempArraylist,num_proc , new Consumer<Annotation>() {
 
-				public void accept(Annotation arg0) 
-				{
-					
-					//System.out.println("---------PROCESSING PARSED TREE FOR DOCUMENT---------");
-					String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
-					//System.out.println("DOC_ID:: "+doc_id);
-					List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
-					for(CoreMap sentence: sentences) 
+					public void accept(Annotation arg0) 
 					{
-						
-						for (CoreLabel token: sentence.get(TokensAnnotation.class)) 
+						instance.docs_parsed++;
+						String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
+						List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
+						for(CoreMap sentence: sentences) 
 						{
-							String word = token.get(TextAnnotation.class);
-							String pos = token.get(PartOfSpeechAnnotation.class);
-							String ne = token.get(NamedEntityTagAnnotation.class);
-						}
-						Tree tree = sentence.get(TreeAnnotation.class);
-						//System.out.println(sentence+"\n"+tree);
-						//SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
-						//System.out.println(dependencies);
+							for (CoreLabel token: sentence.get(TokensAnnotation.class)) 
+							{
+								String word = token.get(TextAnnotation.class);
+								String pos = token.get(PartOfSpeechAnnotation.class);
+								String ne = token.get(NamedEntityTagAnnotation.class);
+							}
+							Tree tree = sentence.get(TreeAnnotation.class);
+							//SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
+						}		
 					}
-					System.out.println("processd:"+sentences.size());
-				}
-			});
-			//System.out.println(instance.pipeline.timingInformation());
-			//instance.pipeline.prettyPrint(annotation, out);
-			instance.annotate_list.clear();	 
+				});
+			}
+			instance.log.debug(log_token+" Batch time:"+instance.batch_timer);
+			instance.batch_timer.reset();
+                        instance.log.debug(log_token+"No of documents parsed:"+instance.docs_parsed);
+			instance.log.debug(log_token+" Total time:"+instance.total_timer);
+			instance.idle_timer.reset();
+			instance.idle_timer.start();
+			tempArraylist.clear();	 
 			StanfordCoreNLP.clearAnnotatorPool();
 		}
 	}
 }
-
