@@ -37,10 +37,10 @@ public class consumer
 	private JSONParser parser = new JSONParser();
 	//need to find a way to change this 500.
     private ArrayBlockingQueue<Annotation> queue;
+	private  Logger log = Logger.getLogger(getClass());
 	private Stopwatch batch_timer;
 	private Stopwatch total_timer;
 	private Stopwatch idle_timer;
-	private Logger log = Logger.getLogger("log4j.properties");
 	private int docs_parsed;
 	static 
 	{
