@@ -1,35 +1,31 @@
+import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.ConnectException;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
-import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;
-import org.apache.log4j.spi.LoggerFactory;
-import org.bson.Document;
-import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+
 import com.google.common.base.Stopwatch;
-import com.mongodb.Block;
-import com.mongodb.BulkUpdateRequestBuilder;
-import com.mongodb.BulkWriteOperation;
-import com.mongodb.DB;
-import com.mongodb.MongoClient;
-import com.mongodb.client.FindIterable;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.MongoIterable;
-import com.rabbitmq.client.*;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.DefaultConsumer;
+import com.rabbitmq.client.Envelope;
+
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreAnnotations.NamedEntityTagAnnotation;
 import edu.stanford.nlp.ling.CoreAnnotations.PartOfSpeechAnnotation;
@@ -44,14 +40,6 @@ import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.CollapsedCCProcess
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.time.LocalDateTime;
-import java.io.PrintStream;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 public class consumer_paper 
 {
 
@@ -63,42 +51,25 @@ public class consumer_paper
 	private Stopwatch batch_timer;
 	private Stopwatch total_timer;
 	private Stopwatch idle_timer;
-	//private Logger log = Logger.getLogger("//home//phani//workspace//corenlp_consumer//src//corenlp_consumer//log4j.properties");
+	//private Logger log = Logger.getLogger("C://Users//Phani//workspace//Rabbitmq//src//log4j.properties");
 	private Logger log=Logger.getLogger(getClass());
 	private int docs_parsed;
-	private int docs_inserted;
-	private java.sql.Connection c=null;
 	static 
 	{
 		instance = new consumer_paper();
 		Properties props = new Properties();
-		//props.put("annotators", "tokenize, ssplit,pos,parse");
+		//props.setProperty("annotators", "tokenize, ssplit,pos,parse");
 		props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
-		props.setProperty("parse.model","edu/stanford/nlp/models/srparser/englishSR.ser.gz");
+		props.put("parse.model","edu/stanford/nlp/models/srparser/englishSR.ser.gz");
 		instance.pipeline = new StanfordCoreNLP(props);
 		instance.batch_timer= Stopwatch.createUnstarted();
 		instance.total_timer=Stopwatch.createStarted();
 		instance.idle_timer=Stopwatch.createStarted();
 		instance.docs_parsed=0;
-		/*instance.docs_inserted=0;
-		try {
-			Class.forName("org.sqlite.JDBC");
-			instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
-			PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR PRIMARY KEY ,output VARCHAR)");
-            stmt.executeUpdate();
-		} catch ( Exception e ) {
-			System.err.println( e.getClass().getName() + ": " + e.getMessage() );
-			 
-		}
-		System.out.println("Opened database successfully");
-		*/
-	}
 
+	}
 	public static void main(String[] argv) throws Exception 
 	{
-		//BasicConfigurator.configure();
-		PropertyConfigurator.configure("log4j.properties");
-
 		final int num_proc ;
 		final int num_docs;
 		final String log_token;
@@ -158,12 +129,14 @@ public class consumer_paper
 				} 
 				catch(InterruptedException v) 
 				{
-					System.out.println(v);
+					StringWriter errors = new StringWriter();
+					v.printStackTrace(new PrintWriter(errors));
+					instance.log.error(log_token+": "+errors.toString());
 				}
 			}  
 		};
 		//start the monitor thread here.
-		monitorThread.start();
+		//monitorThread.start();
 
 		try 
 		{
@@ -180,11 +153,13 @@ public class consumer_paper
 			M_ip= (String) mongo.get("ip");
 			M_port= Integer.parseInt((String) mongo.get("port"));
 			M_db= (String) mongo.get("db");
-			 
+			System.out.println(M_db); 
 		} 
 		catch (Exception e) 
 		{
-			e.printStackTrace();
+			StringWriter errors = new StringWriter();
+			e.printStackTrace(new PrintWriter(errors));
+			instance.log.error(log_token+": "+errors.toString());
 		}
 		// RabbitMQ code
 		ConnectionFactory factory = new ConnectionFactory();
@@ -206,7 +181,7 @@ public class consumer_paper
 				@Override
 				public void handleDelivery(String consumerTag, Envelope envelope,
 						AMQP.BasicProperties properties, byte[] body) throws IOException 
-				{
+						{
 					ackCount=ackCount+1;
 					String message = new String(body, "UTF-8");
 					// System.out.println(" [x] Received  messages'");
@@ -236,8 +211,9 @@ public class consumer_paper
 							ps.close();
 
 						} catch (IOException e1) {
-							System.out.println("this is error for logging the memory leakage: ");
-							e1.printStackTrace();
+							StringWriter errors = new StringWriter();
+							e1.printStackTrace(new PrintWriter(errors));
+							instance.log.error(log_token+": "+errors.toString());
 						}
 
 					} 	
@@ -249,13 +225,14 @@ public class consumer_paper
 							channel.basicAck(envelope.getDeliveryTag(), true);
 						}
 					}
-				}
+						}
 			};
 			channel.basicConsume(R_queue, false, consumer_rabbimq);
 		}catch(ConnectException e2)
 		{
-			e2.printStackTrace();
-			instance.log.error("Cannot connect to server, network error!");
+			StringWriter errors = new StringWriter();
+			e2.printStackTrace(new PrintWriter(errors));
+			instance.log.error(log_token+": "+errors.toString());
 		}
 		finally
 		{
@@ -280,53 +257,43 @@ public class consumer_paper
 			instance.queue.drainTo(tempArraylist);
 			if(tempArraylist.size()>0)
 			{
-				instance.pipeline.annotate(tempArraylist,num_proc , new Consumer<Annotation>() {
+				try
+				{
+					instance.pipeline.annotate(tempArraylist,num_proc , new Consumer<Annotation>() {
 
-					public void accept(Annotation arg0) 
-					{
-						instance.docs_parsed++;
-						String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
-						JSONObject doc_out= new JSONObject(); // main object
-						doc_out.put("doc_id", doc_id);
-						JSONObject sen_obj= new JSONObject(); // sentence object;
-						//instance.log.debug(doc_id+": PARSING");
-						List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
-						for(CoreMap sentence: sentences) 
+						public void accept(Annotation arg0) 
 						{
-							for (CoreLabel token: sentence.get(TokensAnnotation.class)) 
+							instance.docs_parsed++;
+							String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
+							//instance.log.debug(doc_id+": PARSING");
+							List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
+							for(CoreMap sentence: sentences) 
 							{
-								String word = token.get(TextAnnotation.class);
-								String pos = token.get(PartOfSpeechAnnotation.class);
-								String ne = token.get(NamedEntityTagAnnotation.class);
+								for (CoreLabel token: sentence.get(TokensAnnotation.class)) 
+								{
+									String word = token.get(TextAnnotation.class);
+									String pos = token.get(PartOfSpeechAnnotation.class);
+									String ne = token.get(NamedEntityTagAnnotation.class);
+								}
+								Tree tree = sentence.get(TreeAnnotation.class);
+								SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
 							}
-							Tree tree = sentence.get(TreeAnnotation.class);
-							sen_obj.put(sentence, tree);
-							SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
+							//instance.log.debug(doc_id+": PARSED");
 						}
-						//instance.log.debug(doc_id+": PARSED");
-						doc_out.put("sentences", sen_obj);
-						/*try {
-							PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id, output) VALUES (?,?)");
-							stmt.setString(1, doc_id.toString());
-							stmt.setString(2, doc_out.toJSONString());
-							if(stmt.executeUpdate()==1){
-								System.out.println(++instance.docs_inserted+": Successfully inserted");
-							}
-							 
-						} catch (SQLException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}*/
-					}
-				});
-
+					});
+				}
+				catch(Exception e)
+				{
+					StringWriter errors = new StringWriter();
+					e.printStackTrace(new PrintWriter(errors));
+					instance.log.error(log_token+": "+errors.toString());
+				}
 			}
 			//instance.log.debug(log_token+" #Documents: "+instance.docs_parsed);
-			String Stanford_timing=instance.pipeline.timingInformation();
-			instance.log.debug("#Documents: "+instance.docs_parsed+"\nStanford_timing: "+Stanford_timing+"\nTotal time: "+instance.total_timer);
+			instance.log.debug(log_token+" #Documents: "+instance.docs_parsed+" Stanford Timing"+instance.pipeline.timingInformation()+" Total time: "+instance.total_timer);
 			//instance.log.debug(log_token+" Batch time: "+instance.batch_timer);
 			instance.batch_timer.reset();
-			//instance.log.debug(log_token+" #Documents:" +instance.docs_parsed +" Total time: "+instance.total_timer);
+			//instance.log.debug(log_token+" Total time: "+instance.total_timer);
 			instance.idle_timer.reset();
 			instance.idle_timer.start();
 			tempArraylist.clear();	 
