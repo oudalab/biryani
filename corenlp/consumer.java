@@ -18,6 +18,7 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.apache.log4j.spi.LoggerFactory;
 import org.bson.Document;
+import org.hamcrest.core.IsNot;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -69,6 +70,7 @@ public class consumer
 	private Stopwatch batch_timer;
 	private Stopwatch total_timer;
 	private Stopwatch idle_timer;
+	private Stopwatch flush_timer;
 	private Logger log=Logger.getLogger(getClass());
 	private int docs_parsed;
 	private int docs_inserted;
@@ -85,6 +87,7 @@ public class consumer
 		instance.batch_timer= Stopwatch.createUnstarted();
 		instance.total_timer=Stopwatch.createStarted();
 		instance.idle_timer=Stopwatch.createStarted();
+		instance.flush_timer=Stopwatch.createStarted();
 		instance.docs_parsed=0;
 		/*instance.docs_inserted=0;
 		try {
@@ -182,7 +185,7 @@ public class consumer
 				int last_index= instance.env_queue.size();
 				ArrayList<Envelope>envArrayList= new ArrayList<Envelope>();
 				instance.env_queue.drainTo(envArrayList);
-				if(last_index>0)
+				if(last_index>0 && instance.flush_timer.elapsed(TimeUnit.MILLISECONDS)>=60000)
 				{
 					try 
 					{
@@ -261,6 +264,8 @@ public class consumer
 						annotation.set(CoreAnnotations.DocIDAnnotation.class, doc_id);
 						instance.queue.put(annotation);
 						instance.env_queue.put(envelope);
+						instance.flush_timer.reset();
+						instance.flush_timer.start();
 						doWork(num_proc,num_docs,log_token,false);
 					}
 					//exit error may not be a parser exception 
@@ -316,7 +321,7 @@ public class consumer
 		if(instance.queue.remainingCapacity()==0 || flush==true)
 		{
 			if(flush)
-				instance.log.debug(log_token+"Timeout Parsing");
+				instance.log.debug(log_token+" Timeout Parsing");
 			instance.env_queue.clear();
 			String id= UUID.randomUUID().toString();
 			instance.log.debug(log_token+": "+id+" Standord Thread started");
