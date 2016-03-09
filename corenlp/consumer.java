@@ -81,6 +81,8 @@ public class consumer
 		instance = new consumer();
 		Properties props = new Properties();
 		props.setProperty("annotators", "tokenize, ssplit,pos,parse");
+		Integer cores= Runtime.getRuntime().availableProcessors();
+		props.setProperty("threads", cores.toString());
 		//props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
 		props.setProperty("parse.model","edu/stanford/nlp/models/srparser/englishSR.ser.gz");
 		instance.pipeline = new StanfordCoreNLP(props);
@@ -89,7 +91,7 @@ public class consumer
 		instance.idle_timer=Stopwatch.createStarted();
 		instance.flush_timer=Stopwatch.createStarted();
 		instance.docs_parsed=0;
-		/*instance.docs_inserted=0;
+		instance.docs_inserted=0;
 		try {
 			Class.forName("org.sqlite.JDBC");
 			instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
@@ -100,7 +102,7 @@ public class consumer
 			 
 		}
 		System.out.println("Opened database successfully");
-		*/
+		
 	}
 
 	public static void main(String[] argv) throws Exception 
@@ -316,7 +318,7 @@ public class consumer
 
 		}
 	}
-	private static void doWork(int num_proc,int num_docs,String log_token, boolean flush) throws Exception {
+	private static void doWork(int num_proc,int num_docs,final String log_token, boolean flush) throws Exception {
 		//System.out.println("Inside dowork queue size"+instance.queue.size());
 		if(instance.queue.remainingCapacity()==0 || flush==true)
 		{
@@ -330,6 +332,7 @@ public class consumer
 			instance.queue.drainTo(tempArraylist);
 			if(tempArraylist.size()>0)
 			{
+				//System.out.println(instance.pipeline.getProperties());
 				instance.pipeline.annotate(tempArraylist,num_proc , new Consumer<Annotation>() {
 
 					public void accept(Annotation arg0) 
@@ -338,9 +341,10 @@ public class consumer
 						String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
 						JSONObject doc_out= new JSONObject(); // main object
 						doc_out.put("doc_id", doc_id);
-						JSONObject sen_obj= new JSONObject(); // sentence object;
+						JSONArray sen_array= new JSONArray();
 						instance.log.debug(doc_id+": PARSING");
 						List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
+						int sen_id=0;
 						for(CoreMap sentence: sentences) 
 						{
 							/*for (CoreLabel token: sentence.get(TokensAnnotation.class)) 
@@ -350,23 +354,28 @@ public class consumer
 								String ne = token.get(NamedEntityTagAnnotation.class);
 							}*/
 							Tree tree = sentence.get(TreeAnnotation.class);
-							sen_obj.put(sentence, tree);
+							JSONObject sen_obj= new JSONObject(); // sentence object;
+							sen_obj.put("sen_id", ++sen_id);
+							sen_obj.put("sentence", sentence);
+							sen_obj.put("tree", tree);
+							sen_array.add(sen_obj);
 							//SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
 						}
 						instance.log.debug(doc_id+": PARSED");
-						doc_out.put("sentences", sen_obj);
-						/*try {
+						doc_out.put("sentences", sen_array);
+						//System.out.println(doc_out);
+						try {
 							PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id, output) VALUES (?,?)");
 							stmt.setString(1, doc_id.toString());
 							stmt.setString(2, doc_out.toJSONString());
 							if(stmt.executeUpdate()==1){
-								System.out.println(++instance.docs_inserted+": Successfully inserted");
+								instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
 							}
 							 
 						} catch (SQLException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
-						}*/
+						}
 					}
 				});
 
@@ -384,4 +393,3 @@ public class consumer
 		}
 	}
 }
-
