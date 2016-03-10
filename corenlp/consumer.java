@@ -95,13 +95,15 @@ public class consumer
 		try {
 			Class.forName("org.sqlite.JDBC");
 			instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
-			PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR PRIMARY KEY ,output VARCHAR)");
+			PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR , output VARCHAR)");
             stmt.executeUpdate();
 		} catch ( Exception e ) {
 			System.err.println( e.getClass().getName() + ": " + e.getMessage() );
-			 
+			instance.log.debug("Error with SQlite");
+ 
 		}
-		System.out.println("Opened database successfully");
+		instance.log.debug("Database successfully connected");
+
 		
 	}
 
@@ -344,7 +346,7 @@ public class consumer
 						JSONArray sen_array= new JSONArray();
 						instance.log.debug(doc_id+": PARSING");
 						List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
-						int sen_id=0;
+						Integer sen_id=0;
 						for(CoreMap sentence: sentences) 
 						{
 							/*for (CoreLabel token: sentence.get(TokensAnnotation.class)) 
@@ -355,9 +357,9 @@ public class consumer
 							}*/
 							Tree tree = sentence.get(TreeAnnotation.class);
 							JSONObject sen_obj= new JSONObject(); // sentence object;
-							sen_obj.put("sen_id", ++sen_id);
-							sen_obj.put("sentence", sentence);
-							sen_obj.put("tree", tree);
+							sen_obj.put("sen_id", (++sen_id).toString());
+							sen_obj.put("sentence", sentence.toString());
+							sen_obj.put("tree", tree.toString());
 							sen_array.add(sen_obj);
 							//SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
 						}
