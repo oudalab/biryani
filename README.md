@@ -1,7 +1,38 @@
 # biryani
 
+<h1> Installing </h1>
 
-# Queue/QueueProducer_Consumer.py
+<b>Step 1:</b> 
+  Install docker.
+
+<b>Step 2:</b>
+  Download the local copy of the biryani repo.
+  Go to the folder corenlp and run the following command.
+  
+  ```docker build -t image-name . ```
+  
+  <i>Note:</i> There is a period after image-name, which specifies that Docker file is in current directory. 
+  
+  Example: ``` docker build -t phani\ccnlp:1.0 . ```
+  
+<b>Step 3:</b>
+  To run the image created
+  
+  ```docker run image-name java -cp ".:lib/*" consumer #threads #documents(batch size) ```
+  
+  <i>Note:</i> Be careful with the image name you give. If the image is not present, docker searches for the image in the dockerhub and if there an image it would download the image and run the for you.
+  
+  Example: ```docker run phani\ccnlp:1.0 java -cp ".:lib/*" consumer 16 200```
+  
+  
+#Logging
+
+Logging for the repo is setup by using [docker-elk](https://github.com/deviantony/docker-elk).
+
+Walk through the instruction and make sure you open the port for logstash in you docker-compose.yml file.
+
+
+# queue/queue_producer_consumer.py
 A python module contining two functions producer and consumer. Each function reads the configuration file and executes accordingly.  
 Consumer function generates a RabbitMQ queue by fetching data form the MongoDB.  
 Procuder function consumes the messages in the queue and processed accordingly.  
@@ -13,22 +44,22 @@ queue.consumer()
 <b>calling producer</b>    
 queue.producer()    
 
-# Queue/Queue.conf
+# queue/queue.json
 
 This the configuration file needed for the python module.
 
-# CoreNlp/Dockerfile
+# corenlp/Dockerfile
 
 A Dockerfile which builds a corenlp container
 
-#CoreNlp/corenlp.conf
+# corenlp/corenlp.json
 
 Configuration file which specifies how the output of the corenlp container to be processed
 
-# Petrach/Dockerfile
+# petrach/Dockerfile
 
 A Dockerfile which builds a pertach container
 
-#Petrach/petrach.conf
+# retrach/petrach.json
 
 A configuration file which specifies how the output of the petrach container to be processed
