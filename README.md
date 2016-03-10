@@ -23,6 +23,14 @@
   <i>Note:</i> Be careful with the image name you give. If the image is not present, docker searches for the image in the dockerhub and if there an image it would download the image and run the for you.
   
   Example: ```docker run phani\ccnlp:1.0 java -cp ".:lib/*" consumer 16 200```
+  
+  
+#Logging
+
+Logging for the repo is setup by using [docker-elk](https://github.com/deviantony/docker-elk).
+
+Walk through the instruction and make sure you open the port for logstash in you docker-compose.yml file.
+
 
 # queue/queue_producer_consumer.py
 A python module contining two functions producer and consumer. Each function reads the configuration file and executes accordingly.  
