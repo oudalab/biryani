@@ -10,7 +10,8 @@ RUN wget -qO- -O tmp.zip http://nlp.stanford.edu/software/stanford-corenlp-full-
      wget http://apache.arvixe.com/logging/log4j/1.2.17/log4j-1.2.17.zip && \
      unzip -o log4j-1.2.17.zip && \
      wget https://oss.sonatype.org/content/repositories/releases/org/mongodb/mongo-java-driver/3.0.4/mongo-java-driver-3.0.4.jar && \
-     wget https://oss.sonatype.org/content/repositories/releases/org/mongodb/bson/3.0.4/bson-3.0.4.jar && \ 
+     wget https://oss.sonatype.org/content/repositories/releases/org/mongodb/bson/3.0.4/bson-3.0.4.jar && \
+     wget https://bitbucket.org/xerial/sqlite-jdbc/downloads/sqlite-jdbc-3.8.11.2.jar && \
      mkdir -p lib && mv json-simple-1.1.1.jar lib && \
      mv guava-19.0.jar  lib && \
      mv stanford-corenlp-full-2015-12-09/*jar lib && \
@@ -18,7 +19,8 @@ RUN wget -qO- -O tmp.zip http://nlp.stanford.edu/software/stanford-corenlp-full-
      mv rabbitmq-java-client-bin-3.6.0/*jar lib && \
      mv apache-log4j-1.2.17/*jar lib && \
      mv mongo-java-driver-3.0.4.jar lib && \
-     mv bson-3.0.4.jar lib
-RUN     javac -cp "lib/*" consumer.java 
+     mv bson-3.0.4.jar lib && \
+     mv sqlite-jdbc-3.8.11.2.jar lib
+RUN  javac -cp "lib/*" sqlite_reader.java consumer.java 
 CMD  javac -cp "lib/*" consumer.java && java -cp ".:lib/*" consumer
 
