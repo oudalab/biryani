@@ -208,14 +208,12 @@ public class consumer
             public void run() {
                 // TODO Auto-generated method stub
                 //System.out.println("Timer method Queue Size "+instance.queue.size());
-                if(last_index<=0)
-                    last_index= instance.env_queue.size();
-                //System.out.println("last index "+last_index);
-                if(envArrayList!=null)
                 instance.env_queue.drainTo(envArrayList);
+                last_index= envArrayList.size();
+                //System.out.println("last index "+last_index);
                 //System.out.println("env array list size "+envArrayList.size());
                 //System.out.println(instance.flush_timer.elapsed(TimeUnit.MILLISECONDS));
-                if(last_index>0 && instance.flush_timer.elapsed(TimeUnit.MILLISECONDS)>=60000)
+                if(!instance.batch_timer.isRunning() && last_index>0 && instance.flush_timer.elapsed(TimeUnit.MILLISECONDS)>=60000)
                 {
                     try
                     {
@@ -223,8 +221,7 @@ public class consumer
                         doWork(num_proc, envArrayList.size(), log_token, true);
                         instance.channel.basicAck(envArrayList.get(last_index-1).getDeliveryTag(), true);
                         last_index=0;
-                        envArrayList=null;
-
+                        envArrayList.clear();
                     }
                     catch (IOException e)
                     {
@@ -237,7 +234,7 @@ public class consumer
                     }
                 }
             }
-        }, 0,6000);
+        }, 0,60000);
         //**************************************************************//
 
 
