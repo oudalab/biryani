@@ -198,7 +198,7 @@ public class consumer
             }
         };
         //start the monitor thread here.
-        //monitorThread.start();
+        /*monitorThread.start();*/
 
         Timer timer= new Timer();
         timer.schedule(new TimerTask() {
