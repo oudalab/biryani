@@ -430,7 +430,7 @@ public class consumer
             //instance.log.debug("Stanford Timing: "+Stanford_timing);
             instance.log.debug(log_token+" #Batch_Doc:" +num_docs +" Batch time: "+instance.batch_timer);
             instance.batch_timer.reset();
-            instance.log.debug(log_token+" #Documents:" +instance.docs_parsed +" Total time: "+instance.total_timer);
+            instance.log.debug(log_token+" #Documents:" +instance.docs_inserted+" Total time: "+instance.total_timer);
             instance.idle_timer.reset();
             instance.idle_timer.start();
             tempArraylist.clear();
