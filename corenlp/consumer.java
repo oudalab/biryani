@@ -1,58 +1,42 @@
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintStream;
 import java.net.ConnectException;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
-
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;
-import org.apache.log4j.spi.LoggerFactory;
-import org.bson.Document;
-import org.hamcrest.core.IsNot;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-
-import com.google.common.base.Stopwatch;
-import com.mongodb.Block;
-import com.mongodb.BulkUpdateRequestBuilder;
-import com.mongodb.BulkWriteOperation;
-import com.mongodb.DB;
-import com.mongodb.MongoClient;
-import com.mongodb.client.FindIterable;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.MongoIterable;
-import com.rabbitmq.client.*;
-
-import edu.stanford.nlp.ling.CoreAnnotations;
-import edu.stanford.nlp.ling.CoreAnnotations.NamedEntityTagAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.PartOfSpeechAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.TextAnnotation;
-import edu.stanford.nlp.ling.CoreAnnotations.TokensAnnotation;
-import edu.stanford.nlp.ling.CoreLabel;
-import edu.stanford.nlp.pipeline.Annotation;
-import edu.stanford.nlp.pipeline.StanfordCoreNLP;
-import edu.stanford.nlp.semgraph.SemanticGraph;
-import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations.CollapsedCCProcessedDependenciesAnnotation;
-import edu.stanford.nlp.trees.Tree;
-import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
-import edu.stanford.nlp.util.CoreMap;
-
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.time.LocalDateTime;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PropertyConfigurator;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import com.google.common.base.Stopwatch;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.DefaultConsumer;
+import com.rabbitmq.client.Envelope;
+import edu.stanford.nlp.ling.CoreAnnotations;
+import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
+import edu.stanford.nlp.pipeline.Annotation;
+import edu.stanford.nlp.pipeline.StanfordCoreNLP;
+import edu.stanford.nlp.trees.Tree;
+import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
+import edu.stanford.nlp.util.CoreMap;
 
 public class consumer
 {
@@ -94,7 +78,7 @@ public class consumer
         try {
             Class.forName("org.sqlite.JDBC");
             instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
-            PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR , output VARCHAR)");
+            PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR , date VARCHAR, output VARCHAR)");
             stmt.executeUpdate();
         } catch ( Exception e ) {
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
@@ -293,10 +277,12 @@ public class consumer
                         JSONObject json = (JSONObject) instance.parser.parse(message);
                         String doc_id= (String)json.get("doc_id");
                         String article_body=(String) json.get("article_body");
+                        String pub_date=(String) json.get("publication_date_raw");
 						/*if the container has resarted then look if the doc id is present in the sqlite database and if
 						 doc id is not present then add to the queue. Do this for first batch size*/
                         Annotation annotation = new Annotation(article_body);
                         annotation.set(CoreAnnotations.DocIDAnnotation.class, doc_id);
+                        annotation.set(CoreAnnotations.DocDateAnnotation.class, pub_date);
                         if(instance.restart_doc_count>=num_docs)
                             restart_status="empty";
                         if(restart_status.equals("started") && instance.restart_doc_count<num_docs)
@@ -395,6 +381,7 @@ public class consumer
                     {
                         instance.docs_parsed++;
                         String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
+                        String pub_date=arg0.get(CoreAnnotations.DocDateAnnotation.class);
                         JSONObject doc_out= new JSONObject(); // main object
                         doc_out.put("doc_id", doc_id);
                         JSONArray sen_array= new JSONArray();
@@ -419,11 +406,11 @@ public class consumer
                         }
                         instance.log.debug(doc_id+": PARSED");
                         doc_out.put("sentences", sen_array);
-                        //System.out.println(doc_out);
                         try {
-                            PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id, output) VALUES (?,?)");
+                            PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id,date,output) VALUES (?,?,?)");
                             stmt.setString(1, doc_id.toString());
-                            stmt.setString(2, doc_out.toJSONString());
+                            stmt.setString(2, pub_date.toString());
+                            stmt.setString(3, doc_out.toJSONString());
                             if(stmt.executeUpdate()==1){
                                 instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
                                 //System.out.println("Doc inserted");
