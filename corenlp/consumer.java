@@ -18,6 +18,9 @@ import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+
+import com.mongodb.util.JSON;
+import edu.stanford.nlp.ling.CoreAnnotation;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.json.simple.JSONArray;
@@ -37,6 +40,8 @@ import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
+
+import javax.json.JsonString;
 
 public class consumer
 {
@@ -78,7 +83,7 @@ public class consumer
         try {
             Class.forName("org.sqlite.JDBC");
             instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
-            PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR , date VARCHAR, output VARCHAR)");
+            PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR , date VARCHAR, output VARCHAR, mongo_id VARCHAR)");
             stmt.executeUpdate();
         } catch ( Exception e ) {
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
@@ -278,11 +283,16 @@ public class consumer
                         String doc_id= (String)json.get("doc_id");
                         String article_body=(String) json.get("article_body");
                         String pub_date=(String) json.get("publication_date_raw");
-						/*if the container has resarted then look if the doc id is present in the sqlite database and if
+                        String mongo_id_json_str=json.get("_id").toString();
+                        JSONObject mongo_id_json_obj= (JSONObject) instance.parser.parse(mongo_id_json_str);
+                        String mongo_id= (String) mongo_id_json_obj.get("$oid");
+
+                        /*if the container has resarted then look if the doc id is present in the sqlite database and if
 						 doc id is not present then add to the queue. Do this for first batch size*/
                         Annotation annotation = new Annotation(article_body);
                         annotation.set(CoreAnnotations.DocIDAnnotation.class, doc_id);
                         annotation.set(CoreAnnotations.DocDateAnnotation.class, pub_date);
+                        annotation.set(CoreAnnotations.DocTitleAnnotation.class,mongo_id);
                         if(instance.restart_doc_count>=num_docs)
                             restart_status="empty";
                         if(restart_status.equals("started") && instance.restart_doc_count<num_docs)
@@ -342,6 +352,7 @@ public class consumer
                         //ToDo: need a way to ackowledge only when the 500 docs finish parsing, make it more durable.
                         if(ackCount%num_docs==0)
                         {
+                            //System.out.println("Sending ACK");
                             instance.channel.basicAck(envelope.getDeliveryTag(), true);
                         }
                     }
@@ -382,6 +393,8 @@ public class consumer
                         instance.docs_parsed++;
                         String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
                         String pub_date=arg0.get(CoreAnnotations.DocDateAnnotation.class);
+                        String mongo_id=arg0.get(CoreAnnotations.DocTitleAnnotation.class);
+                        //System.out.println(mongo_id);
                         JSONObject doc_out= new JSONObject(); // main object
                         doc_out.put("doc_id", doc_id);
                         JSONArray sen_array= new JSONArray();
@@ -407,10 +420,11 @@ public class consumer
                         instance.log.debug(doc_id+": PARSED");
                         doc_out.put("sentences", sen_array);
                         try {
-                            PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id,date,output) VALUES (?,?,?)");
+                            PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id,date,output,mongo_id) VALUES (?,?,?,?)");
                             stmt.setString(1, doc_id.toString());
                             stmt.setString(2, pub_date.toString());
                             stmt.setString(3, doc_out.toJSONString());
+                            stmt.setString(4, mongo_id);
                             if(stmt.executeUpdate()==1){
                                 instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
                                 //System.out.println("Doc inserted");
