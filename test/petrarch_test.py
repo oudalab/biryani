@@ -1,4 +1,3 @@
-
 from petrarch2 import petrarch2, PETRglobals, PETRreader, utilities
 from petrarch2 import PETRtree as ptree
 import sqlite3
@@ -20,23 +19,25 @@ stories=db.stories
 bulk = stories.initialize_unordered_bulk_op()
 #Code for SQlite
 conn = sqlite3.connect('test.db')
+conn2 = sqlite3.connect('test2.db')
 c = conn.cursor()
+c2=conn2.cursor()
 c.execute("SELECT * FROM json_test_table")
+c2.execute('''CREATE TABLE IF NOT EXISTS petrarch_table
+             (doc_id varchar,output varchar,mongo_id varchar )''')
 rows= c.fetchall()
 for row in rows:
+	print 'Document parsing'
 	doc_id= row[0].encode()
-	#print doc_id
 	date=date_formatter(row[1])
-        #print row[2]
-	data_json=json.loads(row[2])
-	#print doc_id
-	#print row[1]
-	#print date
-	#print data_json
+        data_json=json.loads(row[2])
+	mongo_id= row[3].encode()
+ 	sen_out_nsertion= []
+	sen_out_records= []
 	for sentence in data_json['sentences']:
 		sen_dump=json.dumps(sentence)
 		sen_json=json.loads(sen_dump)
-		sen_id=sen_json['sen_id']
+		sen_id=sen_json['sen_id'].encode()
 		sen_data=sen_json['sentence']
 		sen_parse=sen_json['tree']
 		text=sen_data
@@ -45,12 +46,18 @@ for row in rows:
                 try:
 
 			
-			dict = {doc_id: {u'sents': {u'0': {u'content': text, u'parsed': parsed}},
+			dict = {mongo_id: {u'sents': {sen_id: {u'content': text, u'parsed': parsed}},
                 		u'meta': {u'date': date.encode()}}}
 			return_dict = petrarch2.do_coding(dict,None)
-			print(return_dict)
-	
+			#print(return_dict)
+			output={"sen_id": sen_id, "sentence":text, "output":str(return_dict)}
+			sen_out_records.append(output)
                 except:
-			print "Unexpected error"
-                #print len(return_dict)
-	
+			print "****************************************************Unexpected error****************************************"
+
+	#code for inserting to Sqlite db
+	#print len(sen_out_records)
+        c2.execute("""INSERT INTO petrarch_table(doc_id, output, mongo_id) 
+               VALUES (?,?,?)""", (doc_id, str(sen_out_records), mongo_id))
+	conn2.commit()
+c2.close()
