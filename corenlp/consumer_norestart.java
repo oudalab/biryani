@@ -61,8 +61,8 @@ public class consumer_norestart
         instance.restart_doc_count=0;
         try {
             Class.forName("org.sqlite.JDBC");
-            instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
-            PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR , date VARCHAR, output VARCHAR)");
+            instance.c = DriverManager.getConnection("jdbc:sqlite:test_norestart.db");
+            PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR , date VARCHAR, output VARCHAR, mongo_id VARCHAR)");
             stmt.executeUpdate();
         } catch ( Exception e ) {
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
@@ -77,7 +77,7 @@ public class consumer_norestart
     public static void main(String[] argv) throws Exception
     {
         //BasicConfigurator.configure();
-        PropertyConfigurator.configure("/media/phani/5TB/corenlp/out/production/corenlp/log4j.properties");
+        PropertyConfigurator.configure("log4j.properties");
 
         final int num_proc ;
         final int num_docs;
@@ -189,7 +189,7 @@ public class consumer_norestart
 
         try
         {
-            FileReader reader = new FileReader("/media/phani/5TB/corenlp/out/production/corenlp/corenlp.json");
+            FileReader reader = new FileReader("corenlp.json");
             JSONObject jsonobject = (JSONObject) new JSONParser().parse(reader);
             JSONObject rabbit = (JSONObject) jsonobject.get("rabbitmq");
             JSONObject mongo = (JSONObject) jsonobject.get("mongodb");
@@ -241,6 +241,9 @@ public class consumer_norestart
                         JSONObject json = (JSONObject) instance.parser.parse(message);
                         String doc_id= (String)json.get("doc_id");
                         String article_body=(String) json.get("article_body");
+                        String mongo_id_json_str=json.get("_id").toString();
+                        JSONObject mongo_id_json_obj= (JSONObject) instance.parser.parse(mongo_id_json_str);
+                        String mongo_id= (String) mongo_id_json_obj.get("$oid");
                         //String article_body="A Tunisian court has jailed a Nigerian student for two years for helping young militants join an armed Islamic group in Lebanon, his lawyer said Wednesday.";
                         String pub_date=(String) json.get("publication_date_raw");
 						/*if the container has resarted then look if the doc id is present in the sqlite database and if
@@ -248,6 +251,7 @@ public class consumer_norestart
                         Annotation annotation = new Annotation(article_body);
                         annotation.set(CoreAnnotations.DocIDAnnotation.class, doc_id);
                         annotation.set(CoreAnnotations.DocDateAnnotation.class, pub_date);
+                        annotation.set(CoreAnnotations.DocTitleAnnotation.class,mongo_id);
                         instance.queue.put(annotation);
                         instance.env_queue.put(envelope);
                         instance.flush_timer.reset();
@@ -327,6 +331,7 @@ public class consumer_norestart
                         instance.docs_parsed++;
                         String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
                         String pub_date=arg0.get(CoreAnnotations.DocDateAnnotation.class);
+                        String mongo_id=arg0.get(CoreAnnotations.DocTitleAnnotation.class);
                         JSONObject doc_out= new JSONObject(); // main object
                         doc_out.put("doc_id", doc_id);
                         JSONArray sen_array= new JSONArray();
@@ -354,10 +359,11 @@ public class consumer_norestart
                         instance.log.debug(doc_id+": PARSED");
                         doc_out.put("sentences", sen_array);
                         try {
-                            PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id,date,output) VALUES (?,?,?)");
+                            PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id,date,output,mongo_id) VALUES (?,?,?,?)");
                             stmt.setString(1, doc_id.toString());
                             stmt.setString(2, pub_date.toString());
-                            stmt.setString(3, doc_out.toString());
+                            stmt.setString(3, doc_out.toJSONString());
+                            stmt.setString(4, mongo_id);
                             if(stmt.executeUpdate()==1){
                                 instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
                                 //System.out.println("Doc inserted");
