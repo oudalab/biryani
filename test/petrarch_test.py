@@ -32,7 +32,7 @@ for row in rows:
 	date=date_formatter(row[1])
         data_json=json.loads(row[2])
 	mongo_id= row[3].encode()
- 	sen_out_nsertion= []
+ 	sen_out_dict= {}
 	sen_out_records= []
 	for sentence in data_json['sentences']:
 		sen_dump=json.dumps(sentence)
@@ -49,15 +49,17 @@ for row in rows:
 			dict = {mongo_id: {u'sents': {sen_id: {u'content': text, u'parsed': parsed}},
                 		u'meta': {u'date': date.encode()}}}
 			return_dict = petrarch2.do_coding(dict,None)
-			#print(return_dict)
-			output={"sen_id": sen_id, "sentence":text, "output":str(return_dict)}
+			return_dict= json.dumps(return_dict)
+			#print return_dict
+			output=return_dict
 			sen_out_records.append(output)
                 except:
 			print "****************************************************Unexpected error****************************************"
 
 	#code for inserting to Sqlite db
 	#print len(sen_out_records)
+	sen_out_dict['main_output']=json.dumps(sen_out_records)
         c2.execute("""INSERT INTO petrarch_table(doc_id, output, mongo_id) 
-               VALUES (?,?,?)""", (doc_id, str(sen_out_records), mongo_id))
+               VALUES (?,?,?)""", (doc_id, json.dumps(sen_out_dict), mongo_id))
 	conn2.commit()
 c2.close()
