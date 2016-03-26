@@ -17,6 +17,7 @@ for row in rows:
 	#Code for events
 	for element in data_array:
 		element_json=json.loads(element)
+		print element_json
 		if 'sents' in element_json[mongo_id]:
 			for i in range(1,num_sents+1):
 				if element_json[mongo_id]['sents']!=None:
@@ -26,8 +27,8 @@ for row in rows:
 							print 'sen_id: '+str(i)
 							print 'sentence:'+element_json[mongo_id]['sents'][str(i)]['content']
 							print element_json[mongo_id]['sents'][str(i)]['events']
-				#code for getting verbs	
-				#if 'verbs' in element_json[mongo_id]['meta']:
-				#	print element_json[mongo_id]['meta']['verbs']
+		#code for getting verbs	
+		#if 'verbs' in element_json[mongo_id]['meta']:
+		#	print element_json[mongo_id]['meta']['verbs']
 
-			
+		
