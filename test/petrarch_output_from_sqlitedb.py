@@ -17,7 +17,7 @@ for row in rows:
 	#Code for events
 	for element in data_array:
 		element_json=json.loads(element)
-		print element_json
+		#print element_json
 		if 'sents' in element_json[mongo_id]:
 			for i in range(1,num_sents+1):
 				if element_json[mongo_id]['sents']!=None:
