@@ -279,7 +279,7 @@ public class consumer
                             instance.log.debug(log_token+" Container restarted");
                             if (new sqlite_reader().doc_present(mongo_id) != 1)
                             {
-                                System.out.println("restart:Doc Added to queue");
+                                //System.out.println("restart:Doc Added to queue");
                                 instance.queue.put(annotation);
                                 instance.env_queue.put(envelope);
                                 instance.flush_timer.reset();
@@ -289,7 +289,7 @@ public class consumer
                         else
                         {
 
-                            System.out.println("Non restart: doc Added");
+                            //System.out.println("Non restart: doc Added");
                             instance.queue.put(annotation);
                             instance.env_queue.put(envelope);
                             instance.flush_timer.reset();
