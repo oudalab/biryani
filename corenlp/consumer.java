@@ -1,38 +1,5 @@
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.net.ConnectException;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-
-import com.mongodb.util.JSON;
-import edu.stanford.nlp.ling.CoreAnnotation;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import com.google.common.base.Stopwatch;
-import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.DefaultConsumer;
-import com.rabbitmq.client.Envelope;
+import com.rabbitmq.client.*;
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
@@ -40,8 +7,20 @@ import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
-
-import javax.json.JsonString;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PropertyConfigurator;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import java.io.*;
+import java.net.ConnectException;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public class consumer
 {
@@ -298,9 +277,9 @@ public class consumer
                         if(restart_status.equals("started") && instance.restart_doc_count<num_docs)
                         {
                             instance.log.debug(log_token+" Container restarted");
-                            if (new sqlite_reader().doc_present(doc_id) != 1)
+                            if (new sqlite_reader().doc_present(mongo_id) != 1)
                             {
-                                //System.out.println("restart:Doc Added to queue");
+                                System.out.println("restart:Doc Added to queue");
                                 instance.queue.put(annotation);
                                 instance.env_queue.put(envelope);
                                 instance.flush_timer.reset();
@@ -310,7 +289,7 @@ public class consumer
                         else
                         {
 
-                            //System.out.println("Non restart: doc Added");
+                            System.out.println("Non restart: doc Added");
                             instance.queue.put(annotation);
                             instance.env_queue.put(envelope);
                             instance.flush_timer.reset();
