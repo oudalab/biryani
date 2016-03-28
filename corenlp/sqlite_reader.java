@@ -10,13 +10,13 @@ public class sqlite_reader
     private Logger log=Logger.getLogger(getClass());
     private Connection c;
     private PreparedStatement P_stmt;
-    public int doc_present(String doc_id)
+    public int doc_present(String mongo_id)
     {
         try {
             Class.forName("org.sqlite.JDBC");
             c = DriverManager.getConnection("jdbc:sqlite:test.db");
-            P_stmt= c.prepareStatement("SELECT * FROM json_test_table where id=?");
-            P_stmt.setString(1,doc_id);
+            P_stmt= c.prepareStatement("SELECT * FROM json_test_table where mongo_id=?");
+            P_stmt.setString(1,mongo_id);
             ResultSet rs=P_stmt.executeQuery();
             int row_count=0;
             while(rs.next())
@@ -31,4 +31,3 @@ public class sqlite_reader
         return 0;
     }
 }
-
