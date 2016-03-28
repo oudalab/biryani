@@ -277,13 +277,15 @@ public class consumer
                         if(restart_status.equals("started") && instance.restart_doc_count<num_docs)
                         {
                             instance.log.debug(log_token+" Container restarted");
-                            if (new sqlite_reader().doc_present(mongo_id) != 1)
+                            ArrayList <String> mongo_id_list=new sqlite_reader().doc_present(num_docs);
+                            if(!mongo_id_list.contains(mongo_id))
                             {
                                 //System.out.println("restart:Doc Added to queue");
                                 instance.queue.put(annotation);
                                 instance.env_queue.put(envelope);
                                 instance.flush_timer.reset();
                                 instance.flush_timer.start();
+
                             }
                         }
                         else
@@ -408,6 +410,7 @@ public class consumer
                             if(stmt.executeUpdate()==1){
                                 instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
                                 //System.out.println("Doc inserted");
+                                 
                             }
 
                         } catch (SQLException e) {
