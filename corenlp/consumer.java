@@ -297,6 +297,7 @@ public class consumer
                             restart_status="empty";
                         if(restart_status.equals("started") && instance.restart_doc_count<num_docs)
                         {
+                            instance.log.debug(log_token+" Container restarted");
                             if (new sqlite_reader().doc_present(doc_id) != 1)
                             {
                                 //System.out.println("restart:Doc Added to queue");
