@@ -132,6 +132,7 @@ public class consumer
         }
         System.out.println("Batch size: "+num_docs);
         System.out.println("#threads: "+num_proc);
+        
         String R_ip = "";
         int R_port = 0;
         String R_usr = "";
@@ -276,7 +277,7 @@ public class consumer
                             restart_status="empty";
                         if(restart_status.equals("started") && instance.restart_doc_count<num_docs)
                         {
-                            instance.log.debug(log_token+" Container restarted");
+                             
                             ArrayList <String> mongo_id_list=new sqlite_reader().doc_present(num_docs);
                             if(!mongo_id_list.contains(mongo_id))
                             {
