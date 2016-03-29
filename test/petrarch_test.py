@@ -26,7 +26,7 @@ c = conn.cursor()
 c2=conn2.cursor()
 c.execute("SELECT * FROM json_test_table")
 c2.execute('''CREATE TABLE IF NOT EXISTS petrarch_table
-             (doc_id varchar,output varchar,mongo_id varchar )''')
+             (doc_id varchar,output varchar,mongo_id varchar,sents_count integer )''')
 #count of rows inserted 
 docs_inserted=0;
 
@@ -66,8 +66,8 @@ for row in rows:
 			py_logger.error('Parsing failed: '+doc_id+' sen_id: '+sen_id)
 	#code for inserting to Sqlite db
 	sen_out_dict['main_output']=json.dumps(sen_out_records)
-        c2.execute("""INSERT INTO petrarch_table(doc_id, output, mongo_id) 
-               VALUES (?,?,?)""", (doc_id, json.dumps(sen_out_dict), mongo_id))
+        c2.execute("""INSERT INTO petrarch_table(doc_id, output, mongo_id,sents_count) 
+               VALUES (?,?,?,?)""", (doc_id, json.dumps(sen_out_dict), mongo_id,len(sentences)))
 	conn2.commit()
 	docs_inserted=docs_inserted+1;
 	py_logger.debug('doc_id: '+doc_id+' Total sentences: '+ str(len(sentences)) +' #Parsed: '+str(sen_parsed)+' #Failed: '+str(sen_failed)+' #Doc: '+str(docs_inserted))
