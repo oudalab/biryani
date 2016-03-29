@@ -410,6 +410,7 @@ public class consumer
                             if(stmt.executeUpdate()==1){
                                 instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
                                 //System.out.println("Doc inserted");
+                                instance.c.commit();
                                  
                             }
 
