@@ -42,6 +42,7 @@ public class consumer
     private java.sql.Connection c=null;
     private static String restart_status="empty";
     private int restart_doc_count;
+    private ArrayList<String> mongoArrayList;
     static
     {
         instance = new consumer();
@@ -59,6 +60,7 @@ public class consumer
         instance.docs_parsed=0;
         instance.docs_inserted=0;
         instance.restart_doc_count=0;
+        instance.mongoArrayList=new ArrayList<String>();
         try {
             Class.forName("org.sqlite.JDBC");
             instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
@@ -132,6 +134,7 @@ public class consumer
         }
         System.out.println("Batch size: "+num_docs);
         System.out.println("#threads: "+num_proc);
+        instance.log.debug(log_token+" #Threads: "+num_proc+" #Batch_size: "+num_docs);
         
         String R_ip = "";
         int R_port = 0;
@@ -277,9 +280,12 @@ public class consumer
                             restart_status="empty";
                         if(restart_status.equals("started") && instance.restart_doc_count<num_docs)
                         {
-                             
-                            ArrayList <String> mongo_id_list=new sqlite_reader().doc_present(num_docs);
-                            if(!mongo_id_list.contains(mongo_id))
+                            if(instance.mongoArrayList.size()<=0) 
+                            {
+                            	//System.out.println("Getiing documents");
+                            	instance.mongoArrayList=new sqlite_reader().doc_present(num_docs);
+                            }
+                            if(!instance.mongoArrayList.contains(mongo_id))
                             {
                                 //System.out.println("restart:Doc Added to queue");
                                 instance.queue.put(annotation);
@@ -411,7 +417,7 @@ public class consumer
                             if(stmt.executeUpdate()==1){
                                 instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
                                 //System.out.println("Doc inserted");
-                                instance.c.commit();
+                                //instance.c.commit(); //database is in auto commit mode
                                  
                             }
 
