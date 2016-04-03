@@ -135,7 +135,7 @@ public class consumer
         System.out.println("Batch size: "+num_docs);
         System.out.println("#threads: "+num_proc);
         instance.log.debug(log_token+" #Threads: "+num_proc+" #Batch_size: "+num_docs);
-        
+
         String R_ip = "";
         int R_port = 0;
         String R_usr = "";
@@ -209,6 +209,23 @@ public class consumer
         }, 0,60000);
         //**************************************************************//
 
+        //*Batch timer thread
+        Timer batch_timer_thread= new Timer();
+        batch_timer_thread.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if(instance.batch_timer.isRunning())
+                {
+                    if(instance.batch_timer.elapsed(TimeUnit.MINUTES)>6)
+                    {
+                        instance.log.error(log_token+"Taking too long for batch to execute...Restarting the container ");
+                        System.exit(1);
+                    }
+
+                }
+            }
+        }, 0,60000);
+
 
 
         try
@@ -280,10 +297,10 @@ public class consumer
                             restart_status="empty";
                         if(restart_status.equals("started") && instance.restart_doc_count<num_docs)
                         {
-                            if(instance.mongoArrayList.size()<=0) 
+                            if(instance.mongoArrayList.size()<=0)
                             {
-                            	//System.out.println("Getiing documents");
-                            	instance.mongoArrayList=new sqlite_reader().doc_present(num_docs);
+                                //System.out.println("Getiing documents");
+                                instance.mongoArrayList=new sqlite_reader().doc_present(num_docs);
                             }
                             if(!instance.mongoArrayList.contains(mongo_id))
                             {
@@ -373,72 +390,82 @@ public class consumer
             instance.queue.drainTo(tempArraylist);
             if(tempArraylist.size()>0)
             {
+                synchronized (instance)
+                {
+                    instance.pipeline.annotate(tempArraylist,num_proc , new Consumer<Annotation>() {
 
-                //System.out.println(instance.pipeline.getProperties());
-                instance.pipeline.annotate(tempArraylist,num_proc , new Consumer<Annotation>() {
-
-                    public void accept(Annotation arg0)
-                    {
-                        instance.docs_parsed++;
-                        String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
-                        String pub_date=arg0.get(CoreAnnotations.DocDateAnnotation.class);
-                        String mongo_id=arg0.get(CoreAnnotations.DocTitleAnnotation.class);
-                        //System.out.println(mongo_id);
-                        JSONObject doc_out= new JSONObject(); // main object
-                        doc_out.put("doc_id", doc_id);
-                        JSONArray sen_array= new JSONArray();
-                        instance.log.debug(doc_id+": PARSING");
-                        List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
-                        Integer sen_id=0;
-                        for(CoreMap sentence: sentences)
+                        public void accept(Annotation arg0)
                         {
-							/*for (CoreLabel token: sentence.get(TokensAnnotation.class))
-							{
-								String word = token.get(TextAnnotation.class);
-								String pos = token.get(PartOfSpeechAnnotation.class);
-								String ne = token.get(NamedEntityTagAnnotation.class);
-							}*/
-                            Tree tree = sentence.get(TreeAnnotation.class);
-                            JSONObject sen_obj= new JSONObject(); // sentence object;
-                            sen_obj.put("sen_id", (++sen_id).toString());
-                            sen_obj.put("sentence", sentence.toString());
-                            sen_obj.put("tree", tree.toString());
-                            sen_array.add(sen_obj);
-                            //SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
-                        }
-                        instance.log.debug(doc_id+": PARSED");
-                        doc_out.put("sentences", sen_array);
-                        try {
-                            PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id,date,output,mongo_id) VALUES (?,?,?,?)");
-                            stmt.setString(1, doc_id.toString());
-                            stmt.setString(2, pub_date.toString());
-                            stmt.setString(3, doc_out.toJSONString());
-                            stmt.setString(4, mongo_id);
-                            if(stmt.executeUpdate()==1){
-                                instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
-                                //System.out.println("Doc inserted");
-                                //instance.c.commit(); //database is in auto commit mode
-                                 
+                            instance.docs_parsed++;
+                            String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
+                            String pub_date=arg0.get(CoreAnnotations.DocDateAnnotation.class);
+                            String mongo_id=arg0.get(CoreAnnotations.DocTitleAnnotation.class);
+                            //System.out.println(mongo_id);
+                            JSONObject doc_out= new JSONObject(); // main object
+                            doc_out.put("doc_id", doc_id);
+                            JSONArray sen_array= new JSONArray();
+                            instance.log.debug(doc_id+": PARSING");
+                            List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
+                            Integer sen_id=0;
+                            for(CoreMap sentence: sentences)
+                            {
+    							/*for (CoreLabel token: sentence.get(TokensAnnotation.class))
+    							{
+    								String word = token.get(TextAnnotation.class);
+    								String pos = token.get(PartOfSpeechAnnotation.class);
+    								String ne = token.get(NamedEntityTagAnnotation.class);
+    							}*/
+                                Tree tree = sentence.get(TreeAnnotation.class);
+                                JSONObject sen_obj= new JSONObject(); // sentence object;
+                                sen_obj.put("sen_id", (++sen_id).toString());
+                                sen_obj.put("sentence", sentence.toString());
+                                sen_obj.put("tree", tree.toString());
+                                sen_array.add(sen_obj);
+                                //SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
                             }
+                            instance.log.debug(doc_id+": PARSED");
+                            doc_out.put("sentences", sen_array);
+                            try {
+                                PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id,date,output,mongo_id) VALUES (?,?,?,?)");
+                                stmt.setString(1, doc_id.toString());
+                                stmt.setString(2, pub_date.toString());
+                                stmt.setString(3, doc_out.toJSONString());
+                                stmt.setString(4, mongo_id);
+                                if(stmt.executeUpdate()==1){
+                                    instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
+                                    //System.out.println("Doc inserted");
+                                    //instance.c.commit(); //database is in auto commit mode
 
-                        } catch (SQLException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
+                                }
+                                else
+                                {
+                                    instance.log.error(log_token+"ERROR in inserting document");
+                                }
+
+                            } catch (SQLException e) {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                                instance.log.error(log_token+"Exception in inserting documents");
+                            }
                         }
-                    }
-                });
+                    });
+
+                }
+                //System.out.println(instance.pipeline.getProperties());
+
 
 
             }
             //instance.log.debug(log_token+" #Documents: "+instance.docs_parsed);
             //String Stanford_timing=instance.pipeline.timingInformation();
             //instance.log.debug("Stanford Timing: "+Stanford_timing);
-            instance.log.debug(log_token+" #Batch_Doc:" +num_docs +" Batch time: "+instance.batch_timer);
+            instance.log.debug(log_token+" #Batch_Doc:" +instance.docs_parsed +" Batch time: "+instance.batch_timer);
             instance.batch_timer.reset();
             instance.log.debug(log_token+" #Documents:" +instance.docs_inserted+" Total time: "+instance.total_timer);
-            instance.idle_timer.reset();
-            instance.idle_timer.start();
+            instance.flush_timer.reset();
+            instance.flush_timer.start();
             tempArraylist.clear();
+            instance.docs_parsed=0;
             instance.log.debug(log_token+": "+id+" Stanford Thread completed");
 
 
