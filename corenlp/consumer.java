@@ -262,7 +262,7 @@ public class consumer
             final Connection connection = factory.newConnection();
             instance.channel = connection.createChannel();
             instance.channel.queueDeclare(R_queue, true, false, false, null);
-            instance.channel.basicQos(num_docs);
+            instance.channel.basicQos(2*num_docs);
 
             DefaultConsumer consumer_rabbimq = new DefaultConsumer(instance.channel)
             {
@@ -273,7 +273,7 @@ public class consumer
                 public void handleDelivery(String consumerTag, Envelope envelope,
                                            AMQP.BasicProperties properties, byte[] body) throws IOException
                 {
-                    ackCount=ackCount+1;
+                    //ackCount=ackCount+1;
                     String message = new String(body, "UTF-8");
                     //System.out.println(" [x] Received  messages'");
                     try
@@ -295,7 +295,7 @@ public class consumer
                         annotation.set(CoreAnnotations.DocTitleAnnotation.class,mongo_id);
                         if(instance.restart_doc_count>=num_docs)
                             restart_status="empty";
-                        if(restart_status.equals("started") && instance.restart_doc_count<num_docs)
+                        if(restart_status.equals("started") && instance.restart_doc_count<=num_docs)
                         {
                             if(instance.mongoArrayList.size()<=0)
                             {
@@ -306,6 +306,7 @@ public class consumer
                             if(!instance.mongoArrayList.contains(mongo_id))
                             {
                                 //System.out.println("restart:Doc Added to queue");
+                            	ackCount++;
                                 instance.queue.put(annotation);
                                 instance.env_queue.put(envelope);
                                 instance.flush_timer.reset();
@@ -317,6 +318,7 @@ public class consumer
                         {
 
                             //System.out.println("Non restart: doc Added");
+                            ackCount++;
                             instance.queue.put(annotation);
                             instance.env_queue.put(envelope);
                             instance.flush_timer.reset();
