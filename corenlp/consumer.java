@@ -300,6 +300,7 @@ public class consumer
                             if(instance.mongoArrayList.size()<=0)
                             {
                                 //System.out.println("Getiing documents");
+                                instance.log.debug(log_token+" Container restarted and fetching documents");
                                 instance.mongoArrayList=new sqlite_reader().doc_present(num_docs);
                             }
                             if(!instance.mongoArrayList.contains(mongo_id))
