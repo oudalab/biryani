@@ -9,6 +9,8 @@ import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
+import org.hyperic.sigar.Sigar;
+import org.hyperic.sigar.SigarException;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -33,9 +35,10 @@ public class consumer
     private ArrayBlockingQueue<Envelope> env_queue;
     private Stopwatch batch_timer;
     private Stopwatch total_timer;
-    private Stopwatch idle_timer;
     private Stopwatch flush_timer;
     private Logger log=Logger.getLogger(getClass());
+    private int batch_size;
+    private int threads;
     private int docs_parsed;
     private int docs_inserted;
     private Channel channel=null;
@@ -43,24 +46,62 @@ public class consumer
     private static String restart_status="empty";
     private int restart_doc_count;
     private ArrayList<String> mongoArrayList;
+    /*CPU and Memory variables*/
+    private double cpu_usage;
+    private double used_memory;
+    private double cpu_refer;
+    private int cpu_refer_count;
+    private double main_avg_used_memory;
+    private double main_avg_cpu_usage;
+    private int main_avg_count;
+    private Sigar sigar;
+    private int change_batch_count;
+    private String R_queue;
+    private DefaultConsumer consumer_rabbimq;
+    private Long prev_batch_time;
+    private String change_batch;
+    private Long expected_batch_time;
+    private int batch_variator;
+
+    private int doc_added_queue;
+
+
     static
     {
         instance = new consumer();
+        instance.batch_size=0;
+        instance.threads=0;
         Properties props = new Properties();
         props.setProperty("annotators", "tokenize, ssplit,pos,parse");
-        Integer cores= Runtime.getRuntime().availableProcessors();
-        props.setProperty("threads", cores.toString());
+        //Integer cores= Runtime.getRuntime().availableProcessors();
+        //props.setProperty("threads", cores.toString());
         //props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
         props.setProperty("parse.model","edu/stanford/nlp/models/srparser/englishSR.ser.gz");
         instance.pipeline = new StanfordCoreNLP(props);
         instance.batch_timer= Stopwatch.createUnstarted();
         instance.total_timer=Stopwatch.createStarted();
-        instance.idle_timer=Stopwatch.createStarted();
+        Stopwatch.createStarted();
         instance.flush_timer=Stopwatch.createStarted();
         instance.docs_parsed=0;
         instance.docs_inserted=0;
         instance.restart_doc_count=0;
         instance.mongoArrayList=new ArrayList<String>();
+        instance.cpu_usage=0;
+        instance.used_memory=0;
+        instance.cpu_refer=0;
+        instance.cpu_refer_count=0;
+        instance.main_avg_cpu_usage=0;
+        instance.main_avg_used_memory=0;
+        instance.change_batch="NO";
+        instance.change_batch_count=1;
+        instance.main_avg_count=instance.change_batch_count;
+        instance.prev_batch_time= Long.valueOf(5*60);
+        instance.expected_batch_time=instance.prev_batch_time;
+        instance.sigar=new Sigar();
+        instance.batch_variator=1000;
+
+        instance.doc_added_queue=0;
+
         try {
             Class.forName("org.sqlite.JDBC");
             instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
@@ -80,34 +121,31 @@ public class consumer
     {
         //BasicConfigurator.configure();
         PropertyConfigurator.configure("log4j.properties");
-
-        final int num_proc ;
-        final int num_docs;
         final String log_token;
         if (argv.length==1)
         {
-            num_proc=Integer.parseInt(argv[0]);
-            num_docs=1;
+            instance.threads=Integer.parseInt(argv[0]);
+            instance.batch_size=1;
             log_token="test";
 
         }
         else if(argv.length==2)
         {
-            num_proc=Integer.parseInt(argv[0]);
-            num_docs=Integer.parseInt(argv[1]);
+            instance.threads=Integer.parseInt(argv[0]);
+            instance.batch_size=Integer.parseInt(argv[1]);
             log_token="test";
         }
         else if(argv.length==3)
         {
-            num_proc=Integer.parseInt(argv[0]);
-            num_docs=Integer.parseInt(argv[1]);
+            instance.threads=Integer.parseInt(argv[0]);
+            instance.batch_size=Integer.parseInt(argv[1]);
             log_token=argv[2];
 
         }
         else
         {
-            num_proc=1;
-            num_docs=1;
+            instance.threads=1;
+            instance.batch_size=1;
             log_token="test";
         }
 
@@ -116,37 +154,34 @@ public class consumer
         File restart_file= new File("restart_status.txt");
         if(!restart_file.exists())
         {
-            //System.out.println("File doesnot exits");
-            restart_file.createNewFile();
-            FileWriter fw= new FileWriter(restart_file.getAbsoluteFile());
-            BufferedWriter bw= new BufferedWriter(fw);
-            bw.write(log_token);
-            bw.write(":started");
-            bw.close();
+            restartFileWriteData("restart_status.txt","started",instance.batch_size ,log_token,instance.prev_batch_time);
         }
         else
         {
             //System.out.println("File exists");
-            BufferedReader br= new BufferedReader(new FileReader(restart_file.getAbsoluteFile()));
-            String []data= br.readLine().split(":");
-            restart_status=data[1];
+            String file_data[]=getRestartFileData("restart_status.txt");
+            restart_status=(file_data[0].split(":"))[1];
+            instance.batch_size= Integer.parseInt((file_data[1].split(":"))[1]);
+            //System.out.println(instance.batch_size);
+            instance.prev_batch_time= Long.valueOf(file_data[2].split(":")[1]);
+            //System.out.println(instance.prev_batch_time);
+            instance.expected_batch_time=instance.prev_batch_time;
+
 
         }
-        System.out.println("Batch size: "+num_docs);
-        System.out.println("#threads: "+num_proc);
-        instance.log.debug(log_token+" #Threads: "+num_proc+" #Batch_size: "+num_docs);
+        instance.log.debug(log_token+" #Threads: "+instance.threads+" #Batch_size: "+instance.batch_size);
 
         String R_ip = "";
         int R_port = 0;
         String R_usr = "";
         String R_pass = "";
         String R_vhost = "";
-        String R_queue = "";
+        //String R_queue = "";
         String M_ip= "";
         int M_port= 0;
         String M_db= "";
-        instance.queue=new ArrayBlockingQueue<Annotation>(num_docs);
-        instance.env_queue= new ArrayBlockingQueue<Envelope>(num_docs);
+        instance.queue=new ArrayBlockingQueue<Annotation>(instance.batch_size);
+        instance.env_queue= new ArrayBlockingQueue<Envelope>(instance.batch_size);
 
         Thread monitorThread= new Thread() {
             public void run() {
@@ -190,7 +225,7 @@ public class consumer
                     try
                     {
                         //System.out.println("executing thred do ork");
-                        doWork(num_proc, envArrayList.size(), log_token, true);
+                        doWork(instance.threads, envArrayList.size(), log_token, true);
                         instance.channel.basicAck(envArrayList.get(last_index-1).getDeliveryTag(), true);
                         last_index=0;
                         envArrayList.clear();
@@ -216,7 +251,7 @@ public class consumer
             public void run() {
                 if(instance.batch_timer.isRunning())
                 {
-                    if(instance.batch_timer.elapsed(TimeUnit.MINUTES)>6)
+                    if(instance.batch_timer.elapsed(TimeUnit.MINUTES)>instance.prev_batch_time*2)
                     {
                         instance.log.error(log_token+"Taking too long for batch to execute...Restarting the container ");
                         System.exit(1);
@@ -239,7 +274,7 @@ public class consumer
             R_usr = (String) rabbit.get("username");
             R_pass = (String) rabbit.get("password");
             R_vhost = (String) rabbit.get("vhost");
-            R_queue = (String) rabbit.get("queue");
+            instance.R_queue = (String) rabbit.get("queue");
             M_ip= (String) mongo.get("ip");
             M_port= Integer.parseInt((String) mongo.get("port"));
             M_db= (String) mongo.get("db");
@@ -261,10 +296,10 @@ public class consumer
 
             final Connection connection = factory.newConnection();
             instance.channel = connection.createChannel();
-            instance.channel.queueDeclare(R_queue, true, false, false, null);
-            instance.channel.basicQos(2*num_docs);
+            instance.channel.queueDeclare(instance.R_queue, true, false, false, null);
+            instance.channel.basicQos(2*instance.batch_size);
 
-            DefaultConsumer consumer_rabbimq = new DefaultConsumer(instance.channel)
+            instance.consumer_rabbimq = new DefaultConsumer(instance.channel)
             {
                 //create this varaible to do batch acknowledgement
                 int ackCount=0;
@@ -288,25 +323,26 @@ public class consumer
                         String mongo_id= (String) mongo_id_json_obj.get("$oid");
 
                         /*if the container has resarted then look if the doc id is present in the sqlite database and if
-						 doc id is not present then add to the queue. Do this for first batch size*/
+doc id is not present then add to the queue. Do this for first batch size*/
                         Annotation annotation = new Annotation(article_body);
                         annotation.set(CoreAnnotations.DocIDAnnotation.class, doc_id);
                         annotation.set(CoreAnnotations.DocDateAnnotation.class, pub_date);
                         annotation.set(CoreAnnotations.DocTitleAnnotation.class,mongo_id);
-                        if(instance.restart_doc_count>=num_docs)
+                        if(instance.restart_doc_count>=instance.batch_size)
                             restart_status="empty";
-                        if(restart_status.equals("started") && instance.restart_doc_count<=num_docs)
+                        if(restart_status.equals("started") && instance.restart_doc_count<=instance.batch_size)
                         {
                             if(instance.mongoArrayList.size()<=0)
                             {
                                 //System.out.println("Getiing documents");
                                 instance.log.debug(log_token+" Container restarted and fetching documents");
-                                instance.mongoArrayList=new sqlite_reader().doc_present(num_docs);
+                                instance.mongoArrayList=new sqlite_reader().doc_present(instance.batch_size);
                             }
                             if(!instance.mongoArrayList.contains(mongo_id))
                             {
-                                //System.out.println("restart:Doc Added to queue");
-                            	ackCount++;
+                                //System.out.println("restart: doc Added: "+ ++instance.doc_added_queue);
+
+                                ackCount=ackCount+1;
                                 instance.queue.put(annotation);
                                 instance.env_queue.put(envelope);
                                 instance.flush_timer.reset();
@@ -317,15 +353,16 @@ public class consumer
                         else
                         {
 
-                            //System.out.println("Non restart: doc Added");
-                            ackCount++;
+                            //System.out.println("Non restart: doc Added: "+ ++instance.doc_added_queue);
+
+                            ackCount=ackCount+1;
                             instance.queue.put(annotation);
                             instance.env_queue.put(envelope);
                             instance.flush_timer.reset();
                             instance.flush_timer.start();
 
                         }
-                        doWork(num_proc,num_docs,log_token,false);
+                        doWork(instance.threads,instance.batch_size,log_token,false);
 
 
                     }
@@ -359,15 +396,45 @@ public class consumer
                     finally
                     { //set the multiple acknoledge to be true, and only ackownledge every 500 docs
                         //ToDo: need a way to ackowledge only when the 500 docs finish parsing, make it more durable.
-                        if(ackCount%num_docs==0)
+                        if(ackCount==instance.batch_size)
                         {
+
                             //System.out.println("Sending ACK");
                             instance.channel.basicAck(envelope.getDeliveryTag(), true);
+                            //System.out.println(instance.change_batch);
+                            if(!instance.change_batch.equals("NO"))
+                            {
+                                if(instance.change_batch.equals("I"))
+                                {
+                                    instance.batch_size=instance.batch_size+instance.batch_variator;
+                                }
+                                if(instance.change_batch.equals("D"))
+                                {
+                                    instance.batch_size=instance.batch_size-instance.batch_variator;
+                                }
+                                instance.change_batch="NO";
+
+                                System.out.println("Changing batch: "+instance.batch_size);
+                                restartFileWriteData("restart_status.txt","started",instance.batch_size ,log_token,instance.expected_batch_time);
+
+                                //instance.channel.basicQos(instance.batch_size*2);
+
+                                instance.consumer_rabbimq.getChannel().basicQos(2*instance.batch_size);
+
+                                instance.queue=new ArrayBlockingQueue<Annotation>(instance.batch_size);
+                                instance.env_queue= new ArrayBlockingQueue<Envelope>(instance.batch_size);
+                                instance.channel.basicCancel("Phani");
+                                instance.channel.basicConsume(instance.R_queue, false,"Phani",instance.consumer_rabbimq);
+
+                            }
+                            ackCount=0;
+
                         }
                     }
                 }
             };
-            instance.channel.basicConsume(R_queue, false, consumer_rabbimq);
+            instance.channel.basicConsume(instance.R_queue, false,"Phani", instance.consumer_rabbimq);
+
         }catch(ConnectException e2)
         {
             e2.printStackTrace();
@@ -379,10 +446,11 @@ public class consumer
         }
     }
     private static void doWork(int num_proc,int num_docs,final String log_token,boolean flush) throws Exception {
-        //System.out.println("Inside dowork queue size"+instance.queue.size());
-
+        //System.out.println("Inside dowork queue remaining size"+instance.queue.remainingCapacity());
         if(instance.queue.remainingCapacity()==0 || flush==true)
         {
+            //System.out.println("Staritng thread");
+            System.out.println("#Batch: "+num_docs+"\t#Threads: "+num_proc);
             if(flush)
                 instance.log.debug(log_token+" Timeout Parsing");
             instance.env_queue.clear();
@@ -399,6 +467,30 @@ public class consumer
 
                         public void accept(Annotation arg0)
                         {
+
+                            try {
+
+                                instance.used_memory+=instance.sigar.getMem().getUsedPercent();
+
+
+
+                                instance.cpu_refer=instance.sigar.getCpuPerc().getCombined();
+
+                                if(!Double.isNaN(instance.cpu_refer))
+
+                                {
+
+                                    instance.cpu_usage+=instance.cpu_refer*100;
+
+                                    instance.cpu_refer_count++;
+
+                                }
+
+                            } catch (SigarException e1) {
+// TODO Auto-generated catch block
+                                e1.printStackTrace();
+                            }
+
                             instance.docs_parsed++;
                             String doc_id= arg0.get(CoreAnnotations.DocIDAnnotation.class);
                             String pub_date=arg0.get(CoreAnnotations.DocDateAnnotation.class);
@@ -412,12 +504,12 @@ public class consumer
                             Integer sen_id=0;
                             for(CoreMap sentence: sentences)
                             {
-    							/*for (CoreLabel token: sentence.get(TokensAnnotation.class))
-    							{
-    								String word = token.get(TextAnnotation.class);
-    								String pos = token.get(PartOfSpeechAnnotation.class);
-    								String ne = token.get(NamedEntityTagAnnotation.class);
-    							}*/
+                                /*for (CoreLabel token: sentence.get(TokensAnnotation.class))
+                                {
+                                    String word = token.get(TextAnnotation.class);
+                                    String pos = token.get(PartOfSpeechAnnotation.class);
+                                    String ne = token.get(NamedEntityTagAnnotation.class);
+                                }*/
                                 Tree tree = sentence.get(TreeAnnotation.class);
                                 JSONObject sen_obj= new JSONObject(); // sentence object;
                                 sen_obj.put("sen_id", (++sen_id).toString());
@@ -462,6 +554,42 @@ public class consumer
             //instance.log.debug(log_token+" #Documents: "+instance.docs_parsed);
             //String Stanford_timing=instance.pipeline.timingInformation();
             //instance.log.debug("Stanford Timing: "+Stanford_timing);
+            instance.main_avg_cpu_usage+=instance.cpu_usage/instance.cpu_refer_count;
+            instance.main_avg_used_memory+=instance.used_memory/num_docs;
+            //System.out.println("Average Cpu Used % : "+instance.cpu_usage/instance.cpu_refer_count);
+            //System.out.println("Average Used Mem % : "+instance.used_memory/num_docs);
+            if(--instance.main_avg_count==0)
+            {
+                System.out.println("Main Average CPU Used % : "+instance.main_avg_cpu_usage/instance.change_batch_count);
+                System.out.println("Main Average Memory Used % : "+instance.main_avg_used_memory/instance.change_batch_count);
+                System.out.println(log_token+" #Batch_Doc:" +instance.docs_parsed +" Batch time: "+instance.batch_timer.elapsed(TimeUnit.SECONDS));
+                if(instance.main_avg_cpu_usage/instance.change_batch_count<=95 && instance.main_avg_used_memory/instance.change_batch_count<=95 &&instance.batch_timer.elapsed(TimeUnit.SECONDS)<=instance.expected_batch_time+5)
+                {
+                    //System.out.println("Increase batch size");
+                    instance.change_batch="I";
+                    instance.expected_batch_time= instance.batch_timer.elapsed(TimeUnit.SECONDS)*(instance.batch_size+instance.batch_variator)/instance.batch_size;
+                    System.out.println("Expected Time "+(instance.expected_batch_time+5));
+                }
+                else
+                {
+                        //System.out.println("Decrease batch size");
+
+                        if(instance.batch_size-instance.batch_variator>0)
+                        {
+                            instance.change_batch="D";
+                            instance.expected_batch_time= (instance.batch_timer.elapsed(TimeUnit.SECONDS)*(instance.batch_size-instance.batch_variator))/instance.batch_size;
+                            System.out.println("Expected Time "+(instance.expected_batch_time+5));
+                        }
+                }
+                instance.main_avg_cpu_usage=0;
+                instance.main_avg_used_memory=0;
+                instance.main_avg_count=instance.change_batch_count;
+            }
+            instance.used_memory=0;
+            instance.cpu_usage=0;
+            instance.cpu_refer=0;
+            instance.cpu_refer_count=0;
+            instance.prev_batch_time=instance.batch_timer.elapsed(TimeUnit.SECONDS);
             instance.log.debug(log_token+" #Batch_Doc:" +instance.docs_parsed +" Batch time: "+instance.batch_timer);
             instance.batch_timer.reset();
             instance.log.debug(log_token+" #Documents:" +instance.docs_inserted+" Total time: "+instance.total_timer);
@@ -474,5 +602,42 @@ public class consumer
 
         }
 
+    }
+
+
+    static void restartFileWriteData(String filename,String container_status,Integer latest_batch_count,String container_name,Long batch_time)
+    {
+        File restart_file= new File(filename);
+        try {
+            restart_file.createNewFile();
+            FileWriter fw= new FileWriter(restart_file.getAbsoluteFile());
+            BufferedWriter bw= new BufferedWriter(fw);
+            bw.write(container_name);
+            bw.write(":started;latest_batch:");
+            bw.write(latest_batch_count.toString());
+            bw.write(";previous_batch_time:");
+            bw.write(batch_time.toString());
+            bw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    static String [] getRestartFileData(String filename)
+    {
+        File restart_file= new File(filename);
+        BufferedReader br= null;
+        String []data=null;
+        try
+        {
+            br = new BufferedReader(new FileReader(restart_file.getAbsoluteFile()));
+            data= br.readLine().split(";");
+
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+        return data;
     }
 }
