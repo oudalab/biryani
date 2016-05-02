@@ -1,6 +1,5 @@
 import com.google.common.base.Stopwatch;
 import com.rabbitmq.client.*;
-
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
@@ -8,15 +7,12 @@ import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
-
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-
 import java.io.*;
-import java.math.BigInteger;
 import java.net.ConnectException;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -50,7 +46,8 @@ public class consumer
     private sqlite_reader util_db;
     private int batch_data_bytes;
     private int sents_parsed;
- 
+    private int previous_batch_time;
+
     static
     {
         instance = new consumer();
@@ -72,6 +69,7 @@ public class consumer
         instance.util_db=new sqlite_reader();
         instance.batch_data_bytes=0;
         instance.sents_parsed=0;
+        instance.previous_batch_time=0;
         try {
             Class.forName("org.sqlite.JDBC");
             instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
@@ -227,9 +225,9 @@ public class consumer
         batch_timer_thread.schedule(new TimerTask() {
             @Override
             public void run() {
-                if(instance.batch_timer.isRunning())
+                if(instance.batch_timer.isRunning() && instance.previous_batch_time!=0)
                 {
-                    if(instance.batch_timer.elapsed(TimeUnit.MINUTES)>6)
+                    if(instance.batch_timer.elapsed(TimeUnit.SECONDS)>2*instance.previous_batch_time)
                     {
                         instance.log.error(log_token+"Taking too long for batch to execute...Restarting the container ");
                         System.exit(1);
@@ -320,7 +318,7 @@ public class consumer
                             if(!instance.mongoArrayList.contains(mongo_id))
                             {
                                 //System.out.println("restart:Doc Added to queue");
-                            	ackCount++;
+                                ackCount++;
                                 instance.queue.put(annotation);
                                 instance.env_queue.put(envelope);
                                 instance.flush_timer.reset();
@@ -397,7 +395,7 @@ public class consumer
 
         if(instance.queue.remainingCapacity()==0 || flush==true)
         {
-        	 
+
             if(flush)
                 instance.log.debug(log_token+" Timeout Parsing");
             instance.env_queue.clear();
@@ -425,7 +423,7 @@ public class consumer
                             instance.log.debug(doc_id+": PARSING");
                             List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
                             Integer sen_id=0;
-                            instance.sents_parsed=sentences.size();
+                            instance.sents_parsed+=sentences.size();
                             for(CoreMap sentence: sentences)
                             {
     							/*for (CoreLabel token: sentence.get(TokensAnnotation.class))
@@ -478,10 +476,12 @@ public class consumer
             //instance.log.debug(log_token+" #Documents: "+instance.docs_parsed);
             //String Stanford_timing=instance.pipeline.timingInformation();
             //instance.log.debug("Stanford Timing: "+Stanford_timing);
-            instance.util_db.insert_batch_info("test",id, String.valueOf(num_docs), String.valueOf(instance.batch_data_bytes), String.valueOf(instance.sents_parsed),instance.batch_timer.elapsed(TimeUnit.SECONDS));
+            instance.util_db.insert_batch_info("test",id, num_docs, instance.batch_data_bytes, instance.sents_parsed, (int) instance.batch_timer.elapsed(TimeUnit.SECONDS));
             instance.log.debug(log_token+" #Batch_Doc:" +instance.docs_parsed +" Batch time: "+instance.batch_timer);
+            instance.previous_batch_time= (int) instance.batch_timer.elapsed(TimeUnit.SECONDS);
             instance.batch_timer.reset();
             instance.batch_data_bytes=0;
+            instance.sents_parsed=0;
             instance.log.debug(log_token+" #Documents:" +instance.docs_inserted+" Total time: "+instance.total_timer);
             instance.flush_timer.reset();
             instance.flush_timer.start();
