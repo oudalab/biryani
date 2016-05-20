@@ -2,8 +2,11 @@ import com.google.common.base.Stopwatch;
 import com.rabbitmq.client.*;
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
+import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
+import edu.stanford.nlp.semgraph.SemanticGraph;
+import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
@@ -55,7 +58,7 @@ public class consumer
         props.setProperty("annotators", "tokenize, ssplit,pos,parse");
         Integer cores= Runtime.getRuntime().availableProcessors();
         props.setProperty("threads", cores.toString());
-        //props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
+        props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
         props.setProperty("parse.model","edu/stanford/nlp/models/srparser/englishSR.ser.gz");
         instance.pipeline = new StanfordCoreNLP(props);
         instance.batch_timer= Stopwatch.createUnstarted();
@@ -420,25 +423,36 @@ public class consumer
                             JSONObject doc_out= new JSONObject(); // main object
                             doc_out.put("doc_id", doc_id);
                             JSONArray sen_array= new JSONArray();
+                            JSONArray sen_words= new JSONArray();
+                            JSONArray sen_pos= new JSONArray();
+                            JSONArray sen_ne = new JSONArray();
                             instance.log.debug(doc_id+": PARSING");
                             List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
                             Integer sen_id=0;
                             instance.sents_parsed+=sentences.size();
                             for(CoreMap sentence: sentences)
                             {
-    							/*for (CoreLabel token: sentence.get(TokensAnnotation.class))
+    							for (CoreLabel token: sentence.get(CoreAnnotations.TokensAnnotation.class))
     							{
-    								String word = token.get(TextAnnotation.class);
-    								String pos = token.get(PartOfSpeechAnnotation.class);
-    								String ne = token.get(NamedEntityTagAnnotation.class);
-    							}*/
+    								String word = token.get(CoreAnnotations.TextAnnotation.class);
+    								String pos = token.get(CoreAnnotations.PartOfSpeechAnnotation.class);
+    								String ne = token.get(CoreAnnotations.NamedEntityTagAnnotation.class);
+                                    sen_words.add(word);
+                                    sen_pos.add(pos);
+                                    sen_ne.add(ne);
+
+    							}
                                 Tree tree = sentence.get(TreeAnnotation.class);
                                 JSONObject sen_obj= new JSONObject(); // sentence object;
                                 sen_obj.put("sen_id", (++sen_id).toString());
                                 sen_obj.put("sentence", sentence.toString());
                                 sen_obj.put("tree", tree.toString());
+                                sen_obj.put("words",sen_words);
+                                sen_obj.put("pos",sen_pos);
+                                sen_obj.put("ne",sen_ne);
+                                SemanticGraph dependencies = sentence.get(SemanticGraphCoreAnnotations.CollapsedCCProcessedDependenciesAnnotation.class);
+                                sen_obj.put("dependencies",dependencies.toString());
                                 sen_array.add(sen_obj);
-                                //SemanticGraph dependencies = sentence.get(CollapsedCCProcessedDependenciesAnnotation.class);
                             }
                             instance.log.debug(doc_id+": PARSED");
                             doc_out.put("sentences", sen_array);
