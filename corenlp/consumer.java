@@ -219,7 +219,7 @@ public class consumer
             public void run() {
                 if(instance.batch_timer.isRunning() && instance.previous_time>0)
                 {
-                    if(instance.batch_timer.elapsed(TimeUnit.MINUTES)>2*instance.previous_time)
+                    if(instance.batch_timer.elapsed(TimeUnit.SECONDS)>2*instance.previous_time)
                     {
                         instance.log.error(log_token+"Taking too long for batch to execute...Restarting the container ");
                         System.exit(1);
