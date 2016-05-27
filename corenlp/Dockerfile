@@ -24,4 +24,6 @@ RUN wget -qO- -O tmp.zip http://nlp.stanford.edu/software/stanford-corenlp-full-
      mv bson-3.0.4.jar lib && \
      mv hyperic-sigar-1.6.4 lib && \
      mv sqlite-jdbc-3.8.11.2.jar lib
-RUN  javac -cp "lib/*:lib/hyperic-sigar-1.6.4/sigar-bin/lib/*" sqlite_reader.java consumer.java consumer_norestart.java
+RUN  javac -cp "lib/*:lib/hyperic-sigar-1.6.4/sigar-bin/lib/*" sqlite_reader.java consumer.java consumer_norestart.java 
+
+
