@@ -2,6 +2,7 @@ import org.apache.log4j.Logger;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Created by phani on 3/18/16.
@@ -10,6 +11,7 @@ public class sqlite_reader
 {
     private Logger log=Logger.getLogger(getClass());
     private Connection c;
+    private Statement stmt;
     private PreparedStatement P_stmt;
     private ArrayList<String> mongo_id_list= new ArrayList<String>();
     public ArrayList<String> doc_present(String db_name,int size)
@@ -60,5 +62,28 @@ public class sqlite_reader
         }
         return false;
 
+    }
+    public HashMap<String, Float> get_avg_info(String db_name)
+    {
+    	HashMap<String , Float> data= new HashMap<String, Float>();
+    	try {
+            Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:"+db_name+".db");
+            stmt=c.createStatement();
+            ResultSet rs=stmt.executeQuery("Select round(avg(data_size)),round(avg(batch_time)) from batch_info");
+            while(rs.next())
+            {
+            	data.put("avg_size", rs.getFloat(1));
+            	data.put("avg_time", rs.getFloat(2));
+
+            }
+        } 
+    	catch ( Exception e ) {
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            log.debug("Error with SQlite");
+
+        }
+    	
+    	return data;
     }
 }
