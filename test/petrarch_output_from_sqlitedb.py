@@ -3,7 +3,9 @@ from bson import json_util
 import json
 
 
-conn = sqlite3.connect('test2.db')
+input_db='test2'
+input_db=sys.argv[1];
+conn = sqlite3.connect(input_db+'.db')
 c = conn.cursor()
 c.execute("SELECT * FROM petrarch_table")
 rows= c.fetchall()
