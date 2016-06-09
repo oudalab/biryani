@@ -10,6 +10,9 @@ from bson import json_util
 import json
 from date_formatter import date_formatter
 
+input_db='test'
+output_db='test2'
+
 def get_phrases(self, text, parse):
         parsed = utilities._format_parsed_str(parse)
 
@@ -17,7 +20,7 @@ def get_phrases(self, text, parse):
                 {u'sents': {u'0': {u'content': text, u'parsed': parsed}},
                  u'meta': {u'date': u'20010101'}}}
         return_dict = petrarch2.do_coding(ddict, None)
-        
+
         n = return_dict['test123']['meta']['verbs']['nouns']
         nouns = [i[0] for i in n]
         noun_coding = [i[1] for i in n]
@@ -38,9 +41,12 @@ def get_phrases(self, text, parse):
         return(phrase_dict)
 
 
-f = open('/dev/null', 'w')
+#f = open('/dev/null', 'w')
 #sys.stdout = f
-
+print sys.argv;
+input_db=sys.argv[1];
+output_db=sys.argv[2];
+#exit(1);
 config = petrarch2.utilities._get_data('data/config/', 'PETR_config.ini')
 petrarch2.PETRreader.parse_Config(config)
 petrarch2.read_dictionaries()
@@ -57,10 +63,15 @@ batch_time_start=timeit.default_timer()
 
 
 #Sqlite connections
-conn = sqlite3.connect('test.db')
+conn = sqlite3.connect(input_db+'.db')
 c = conn.cursor()
-c.execute("SELECT id,date,output,mongo_id FROM json_test_table")
-conn2 = sqlite3.connect('test2.db')
+try:
+    c.execute("SELECT id,date,output,mongo_id FROM json_test_table")
+except:
+    py_logger.error("Input database error");
+    exit(1);
+
+conn2 = sqlite3.connect(output_db+'.db')
 c2=conn2.cursor()
 c2.execute('''CREATE TABLE IF NOT EXISTS petrarch_table (doc_id varchar,output varchar,mongo_id varchar,sents_count integer )''')
 c2.execute('''CREATE TABLE IF NOT EXISTS phrases (doc_id varchar,mongo_id varchar,phrases varchar,sents_count integer )''')
@@ -103,7 +114,7 @@ for row in rows:
 		text=sen_data
 		parse=sen_parse
 		parsed = utilities._format_parsed_str(parse)
-				
+
                 try:
 			        py_logger.debug('parsing : '+mongo_id)
 			        dict = {mongo_id: {u'sents': {sen_id: {u'content': text, u'parsed': parsed}},u'meta': {u'date': date.encode()}}}
@@ -114,11 +125,11 @@ for row in rows:
 			        sen_out_records.append(output)
 			        sen_parsed= sen_parsed+1;
 				sent_phrases_array[text]= get_phrases('', text, parsed)
-				
+
                 except:
 			        sen_failed=sen_failed+1;
 			        py_logger.error('Parsing failed: '+mongo_id+' sen_id: '+sen_id)
-		
+
 
     #print json.dumps(sent_phrases_array)
     #print error
@@ -132,7 +143,7 @@ for row in rows:
     output_records.append(output_tuple)
     output_records_length=len(output_records)
     phrases_records.append(pharses_tuple)
-   
+
     if(output_records_length==batch_size):
         c2.executemany("""INSERT INTO petrarch_table(doc_id, output, mongo_id,sents_count) VALUES (?,?,?,?)""",
                         output_records)
@@ -148,7 +159,7 @@ for row in rows:
         if(batch_insert_count==batch_loop):
             batch_size=remaining_docs
         py_logger.debug('#Batch_docs '+str(len(output_records))+' Time: '+str(batch_time_taken)+ ' secs'+
-                        ' #Docs present ' + str(docs_present) + ' #Docs inserted ' + str(docs_inserted)) 
+                        ' #Docs present ' + str(docs_present) + ' #Docs inserted ' + str(docs_inserted))
         batch_time_start=timeit.default_timer()
         output_records = []
         output_tuple = ()
