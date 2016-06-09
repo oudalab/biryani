@@ -44,6 +44,7 @@ public class consumer
     private int restart_doc_count;
     private ArrayList<String> mongoArrayList;
     private int previous_time;
+    private String db_name;
     static
     {
         instance = new consumer();
@@ -63,17 +64,8 @@ public class consumer
         instance.restart_doc_count=0;
         instance.mongoArrayList=new ArrayList<String>();
         instance.previous_time=0;
-        try {
-            Class.forName("org.sqlite.JDBC");
-            instance.c = DriverManager.getConnection("jdbc:sqlite:test.db");
-            PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR , date VARCHAR, output VARCHAR, mongo_id VARCHAR)");
-            stmt.executeUpdate();
-        } catch ( Exception e ) {
-            System.err.println( e.getClass().getName() + ": " + e.getMessage() );
-            instance.log.debug("Error with SQlite");
-
-        }
-        instance.log.debug("Database successfully connected");
+        instance.db_name="test";
+        
 
 
     }
@@ -91,6 +83,7 @@ public class consumer
             num_proc=Integer.parseInt(argv[0]);
             num_docs=1;
             log_token="test";
+            instance.db_name="test";
 
         }
         else if(argv.length==2)
@@ -98,21 +91,44 @@ public class consumer
             num_proc=Integer.parseInt(argv[0]);
             num_docs=Integer.parseInt(argv[1]);
             log_token="test";
+            instance.db_name="test";
         }
         else if(argv.length==3)
         {
             num_proc=Integer.parseInt(argv[0]);
             num_docs=Integer.parseInt(argv[1]);
             log_token=argv[2];
+            instance.db_name="test";
 
+        }
+        else if(argv.length==4)
+        {
+            num_proc=Integer.parseInt(argv[0]);
+            num_docs=Integer.parseInt(argv[1]);
+            log_token=argv[2];
+            instance.db_name=argv[3];
         }
         else
         {
             num_proc=1;
             num_docs=1;
             log_token="test";
+            instance.db_name="test";
         }
+        
+        /*Creating SQlite DB to store output*/
+        try {
+            Class.forName("org.sqlite.JDBC");
+            instance.c = DriverManager.getConnection("jdbc:sqlite:"+instance.db_name+".db");
+            PreparedStatement stmt = instance.c.prepareStatement("CREATE TABLE IF NOT EXISTS json_test_table (id VARCHAR , date VARCHAR, output VARCHAR, mongo_id VARCHAR)");
+            stmt.executeUpdate();
+        } catch ( Exception e ) {
+            System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+            instance.log.debug("Error with SQlite");
 
+        }
+        instance.log.debug("Database successfully connected");
+        
         /* Create a file or read to know the restart status of the file */
 
         File restart_file= new File("restart_status.txt");
@@ -304,7 +320,7 @@ public class consumer
                             {
                                 //System.out.println("Getiing documents");
                                 instance.log.debug(log_token+" Container restarted and fetching documents");
-                                instance.mongoArrayList=new sqlite_reader().doc_present("test",num_docs);
+                                instance.mongoArrayList=new sqlite_reader().doc_present(instance.db_name,num_docs);
                             }
                             if(!instance.mongoArrayList.contains(mongo_id))
                             {
@@ -480,5 +496,3 @@ public class consumer
 
     }
 }
-
-
