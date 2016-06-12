@@ -1,6 +1,5 @@
 import com.google.common.base.Stopwatch;
 import com.rabbitmq.client.*;
-
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
@@ -145,7 +144,7 @@ public class consumer
             log_token="test";
             instance.db_name="test";
         }
-        
+        /*code for creating the db file to store output */
         try {
             Class.forName("org.sqlite.JDBC");
             instance.c = DriverManager.getConnection("jdbc:sqlite:"+instance.db_name+".db");
