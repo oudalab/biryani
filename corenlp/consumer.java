@@ -88,14 +88,13 @@ public class consumer
         instance.batch_size=0;
         instance.thread_size=Runtime.getRuntime().availableProcessors();
         instance.consumer_tag=UUID.randomUUID().toString();
-        instance.batch_variator=500;
+        instance.batch_variator=50;
         instance.thread_variator=5;
         instance.ackCount=0;
         instance.mem_info= new ArrayList<Long>();
         instance.time_info= new  ArrayList<Long>();
         instance.db_name="test";
         
-
 
     }
 
@@ -109,42 +108,44 @@ public class consumer
         final String log_token;
         if (argv.length==1)
         {
-            num_proc=Integer.parseInt(argv[0]);
-            num_docs=1;
+            instance.thread_size=Integer.parseInt(argv[0]);
+            instance.batch_size=1;
             log_token="test";
             instance.db_name="test";
 
         }
         else if(argv.length==2)
         {
-            num_proc=Integer.parseInt(argv[0]);
-            num_docs=Integer.parseInt(argv[1]);
+        	instance.thread_size=Integer.parseInt(argv[0]);
+            instance.batch_size=Integer.parseInt(argv[1]);
             log_token="test";
             instance.db_name="test";
         }
         else if(argv.length==3)
         {
-            num_proc=Integer.parseInt(argv[0]);
-            num_docs=Integer.parseInt(argv[1]);
+        	instance.thread_size=Integer.parseInt(argv[0]);
+            instance.batch_size=Integer.parseInt(argv[1]);
             log_token=argv[2];
             instance.db_name="test";
 
         }
         else if(argv.length==4)
         {
-            num_proc=Integer.parseInt(argv[0]);
-            num_docs=Integer.parseInt(argv[1]);
+        	instance.thread_size=Integer.parseInt(argv[0]);
+            instance.batch_size=Integer.parseInt(argv[1]);
             log_token=argv[2];
             instance.db_name=argv[3];
         }
         else
         {
-            num_proc=1;
-            num_docs=1;
+            instance.thread_size=1;
+            instance.batch_size=1;
             log_token="test";
             instance.db_name="test";
         }
-        /*code for creating the db file to store output */
+        
+        /* Create a Db file to store the data */
+        
         try {
             Class.forName("org.sqlite.JDBC");
             instance.c = DriverManager.getConnection("jdbc:sqlite:"+instance.db_name+".db");
@@ -158,6 +159,7 @@ public class consumer
 
         }
         instance.log.debug("Databases successfully Created");
+
 
         /* Create a file or read to know the restart status of the file */
 
@@ -182,7 +184,7 @@ public class consumer
         }
         System.out.println("Batch size: "+instance.batch_size);
         System.out.println("#threads: "+instance.thread_size);
-        instance.log.debug(log_token+" #Threads: "+num_proc+" #Batch_size: "+num_docs);
+        instance.log.debug(log_token+" #Threads: "+instance.thread_size+" #Batch_size: "+instance.batch_size);
 
         String R_ip = "";
         int R_port = 0;
@@ -193,8 +195,8 @@ public class consumer
         String M_ip= "";
         int M_port= 0;
         String M_db= "";
-        instance.queue=new ArrayBlockingQueue<Annotation>(num_docs);
-        instance.env_queue= new ArrayBlockingQueue<Envelope>(num_docs);
+        instance.queue=new ArrayBlockingQueue<Annotation>(instance.batch_size);
+        instance.env_queue= new ArrayBlockingQueue<Envelope>(instance.batch_size);
 
         Thread monitorThread= new Thread() {
             public void run() {
@@ -238,7 +240,7 @@ public class consumer
                     try
                     {
                         //System.out.println("executing thred do ork");
-                        doWork(num_proc, envArrayList.size(), log_token, true);
+                        doWork(instance.thread_size, envArrayList.size(), log_token, true);
                         instance.channel.basicAck(envArrayList.get(last_index-1).getDeliveryTag(), true);
                         last_index=0;
                         envArrayList.clear();
@@ -343,15 +345,15 @@ public class consumer
                         annotation.set(CoreAnnotations.DocIDAnnotation.class, doc_id);
                         annotation.set(CoreAnnotations.DocDateAnnotation.class, pub_date);
                         annotation.set(CoreAnnotations.DocTitleAnnotation.class,mongo_id);
-                        if(instance.restart_doc_count>=num_docs)
+                        if(instance.restart_doc_count>=instance.batch_size)
                             restart_status="empty";
-                        if(restart_status.equals("started") && instance.restart_doc_count<=num_docs)
+                        if(restart_status.equals("started") && instance.restart_doc_count<=instance.batch_size)
                         {
                             if(instance.mongoArrayList.size()<=0)
                             {
                                 //System.out.println("Getiing documents");
                                 instance.log.debug(log_token+" Container restarted and fetching documents");
-                                instance.mongoArrayList=new sqlite_reader().doc_present(instance.db_name,num_docs);
+                                instance.mongoArrayList=instance.util_db.doc_present(instance.db_name,instance.batch_size);
                             }
                             if(!instance.mongoArrayList.contains(mongo_id))
                             {
