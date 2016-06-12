@@ -1,12 +1,8 @@
 import org.apache.log4j.Logger;
-
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-/**
- * Created by phani on 3/18/16.
- */
 public class sqlite_reader
 {
     private Logger log=Logger.getLogger(getClass());
