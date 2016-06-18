@@ -60,6 +60,7 @@ public class consumer
     private ArrayList<Long> mem_info;
     private ArrayList<Long> time_info; 
     private String db_name;
+    private stats stats;
 
     static
     {
@@ -94,6 +95,7 @@ public class consumer
         instance.mem_info= new ArrayList<Long>();
         instance.time_info= new  ArrayList<Long>();
         instance.db_name="test";
+        instance.stats=new stats("stats");
         
 
     }
@@ -159,7 +161,8 @@ public class consumer
 
         }
         instance.log.debug("Databases successfully Created");
-
+        
+        
 
         /* Create a file or read to know the restart status of the file */
 
@@ -564,6 +567,7 @@ public class consumer
             }
             
             instance.primary_start=false;
+            instance.stats.insert_data("stats", String.valueOf(num_proc), String.valueOf(num_docs), String.valueOf(instance.batch_data_bytes), String.valueOf(instance.sents_parsed), String.valueOf(instance.batch_timer.elapsed(TimeUnit.SECONDS)));
             System.out.println("Batch Size(bytes): "+instance.batch_data_bytes+"\nTime Taken(secs): "+Math.round((double)instance.batch_timer.elapsed(TimeUnit.SECONDS)));
             //instance.util_db.insert_batch_info("test",id, num_docs, instance.batch_data_bytes, instance.sents_parsed, (int) instance.batch_timer.elapsed(TimeUnit.SECONDS));
             instance.mem_info.add((long) instance.batch_data_bytes);
