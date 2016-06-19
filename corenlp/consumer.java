@@ -61,6 +61,7 @@ public class consumer
     private ArrayList<Long> time_info; 
     private String db_name;
     private stats stats;
+    private int io_operation;
 
     static
     {
@@ -96,6 +97,7 @@ public class consumer
         instance.time_info= new  ArrayList<Long>();
         instance.db_name="test";
         instance.stats=new stats("stats");
+        instance.io_operation=0;
         
 
     }
@@ -519,6 +521,7 @@ public class consumer
                                     instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
                                     //System.out.println("Doc inserted");
                                     //instance.c.commit(); //database is in auto commit mode
+                                    instance.io_operation++;
 
                                 }
                                 else
@@ -567,7 +570,8 @@ public class consumer
             }
             
             instance.primary_start=false;
-            instance.stats.insert_data("stats", String.valueOf(num_proc), String.valueOf(num_docs), String.valueOf(instance.batch_data_bytes), String.valueOf(instance.sents_parsed), String.valueOf(instance.batch_timer.elapsed(TimeUnit.SECONDS)));
+            instance.stats.insert_data("stats", String.valueOf(num_proc), String.valueOf(num_docs), String.valueOf(instance.batch_data_bytes), String.valueOf(instance.sents_parsed), String.valueOf(instance.io_operation),String.valueOf(instance.batch_timer.elapsed(TimeUnit.SECONDS)));
+            instance.io_operation=0;
             System.out.println("Batch Size(bytes): "+instance.batch_data_bytes+"\nTime Taken(secs): "+Math.round((double)instance.batch_timer.elapsed(TimeUnit.SECONDS)));
             //instance.util_db.insert_batch_info("test",id, num_docs, instance.batch_data_bytes, instance.sents_parsed, (int) instance.batch_timer.elapsed(TimeUnit.SECONDS));
             instance.mem_info.add((long) instance.batch_data_bytes);
