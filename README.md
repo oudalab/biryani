@@ -83,8 +83,11 @@ pip install git+https://github.com/openeventdata/petrarch2.git
 Extracting phrases from corenlp parsed tree and storing them in mongodb<br>
 
 Once the container has parsed all the documents copy the database file to ```biryani/test/``` directory<br>
-In the directory you can find ```getPhrases.py``` file. Open the file and make changes to the following two lines of code<br>
-```input_db='Name of the database given while running the corenlp image created```<br>
+In the directory you can find ```getPhrases.py``` file. Open the file and make changes to the following two lines of code
+```
+input_db='Name of the database given while running the corenlp image created
+```
+<br>
 
 Edit the db and db_phrases according to your mongodb database and to which collection you want to store the phrases.
 ```
