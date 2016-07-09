@@ -15,7 +15,7 @@ channel.queue_declare(queue='main_queue', durable=True)
 channel.confirm_delivery()
 
 #Fetching data from MongoDB and sending to queue
-for story in stories.find({'queue_added':0}):
+for story in stories.find():
 
         doc_id=story['doc_id']
         message=json.dumps(story,default=json_util.default)
