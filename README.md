@@ -49,7 +49,6 @@ log4j
   port => the port number you added in log4j.properties file
 }
 ```
-<br>
 <i>Note:</i> Make sure that use add the port number in the ```docker-compose.yml``` file of the root directory.<br>
 use can ports section in the file, just add the port you added in ```logstash.conf``` here.
 
