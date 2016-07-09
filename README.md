@@ -87,12 +87,9 @@ In the directory you can find ```getPhrases.py``` file. Open the file and make c
 ```
 input_db='Name of the database given while running the corenlp image created
 ```
-<br>
-
 Edit the db and db_phrases according to your mongodb database and to which collection you want to store the phrases.
 ```
 client = MongoClient()
 db=client.test_database
 db_phrases = db.phrases
 ```
-
