@@ -69,7 +69,7 @@ use can ports section in the file, just add the port you added in ```logstash.co
   
   <i>Note:</i> Be careful with the image name you give. If the image is not present, docker searches for the image in the dockerhub and if there an image it would download the image and run the for you.
   
-  Example: ```docker run phani\ccnlp:1.0 java -cp ".:lib/*" consumer 16 200 logging test_database```
+  Example: ```docker run phani\ccnlp:1.0 java -cp ".:"lib/*:lib/hyperic-sigar-1.6.4/sigar-bin/lib/*" consumer 16 200 logging test_database```
 
 <b> Step 9:</b>
 Install Petrarch2<br>
