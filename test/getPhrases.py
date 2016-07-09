@@ -12,24 +12,13 @@ import pymongo
 from pymongo import MongoClient
 from date_formatter import date_formatter
 
-input_db='test'
-output_db='test2'
+input_db='test.db'
 
 f = open('/dev/null', 'w')
 sys.stdout = f
-#print sys.argv;
-#input_db=sys.argv[1];
-#output_db=sys.argv[2];
-#exit(1);
 config = petrarch2.utilities._get_data('data/config/', 'PETR_config.ini')
 petrarch2.PETRreader.parse_Config(config)
 petrarch2.read_dictionaries()
-#Log
-host='ip address'
-port_number=5000
-py_logger = logging.getLogger('python-logstash-logger')
-py_logger.setLevel(logging.DEBUG)
-py_logger.addHandler(logstash.TCPLogstashHandler(host, port_number, version=1))
 
 #Mongo Db
 client = MongoClient()
@@ -37,7 +26,7 @@ db=client.test_database
 db_phrases = db.phrases
 
 #Sqlite connections
-conn = sqlite3.connect('test.db')
+conn = sqlite3.connect(input_db)
 c = conn.cursor()
 try:
     c.execute("SELECT id,date,output,mongo_id FROM json_test_table")
