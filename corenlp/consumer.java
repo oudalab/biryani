@@ -145,7 +145,6 @@ public class consumer
         instance.log.debug("Database successfully connected");
         
         /* Create a file or read to know the restart status of the file */
-
         File restart_file= new File("restart_status.txt");
         if(!restart_file.exists())
         {
@@ -161,7 +160,6 @@ public class consumer
             BufferedReader br= new BufferedReader(new FileReader(restart_file.getAbsoluteFile()));
             String []data= br.readLine().split(":");
             restart_status=data[1];
-
         }
         
         System.out.println("Batch size: "+num_docs);
@@ -221,18 +219,24 @@ public class consumer
         	String last_doc =instance.last_processed_doc_id;
         	@Override
             public void run() {
-                if(instance.batch_timer.isRunning())
+                //System.out.println(instance.idle_timer.elapsed(TimeUnit.SECONDS));
+                if(instance.idle_timer.elapsed(TimeUnit.MINUTES)>=4)
+                {
+                	instance.log.error("Container is idle for to long... Restarting the container");
+                	System.exit(1);
+                }
+        		if(instance.batch_timer.isRunning())
                 {
                 	System.out.println("last doc_id: "+last_doc);
                     if( instance.last_processed_doc_id.equals(last_doc))
                     {
-                    	try {
-							instance.channel.basicAck(instance.envelope.getDeliveryTag(), true);
+                        instance.log.error(log_token+"Taking too long for batch to execute...Restarting the container ");
+                        try {
+							instance.channel.basicAck(instance.envelope.getDeliveryTag(),true);
 						} catch (IOException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
-                        instance.log.error(log_token+"Taking too long for batch to execute...Restarting the container ");
                         System.exit(1);
                     }
                     else
@@ -266,6 +270,7 @@ public class consumer
         }
         // RabbitMQ code
         ConnectionFactory factory = new ConnectionFactory();
+        factory.setAutomaticRecoveryEnabled(true);
         factory.setHost(R_ip);
         factory.setVirtualHost(R_vhost);
         factory.setPort(R_port);
@@ -288,7 +293,8 @@ public class consumer
                 public void handleDelivery(String consumerTag, Envelope envelope,
                                            AMQP.BasicProperties properties, byte[] body) throws IOException
                 {
-                    instance.envelope = envelope; 
+                    //System.out.println("Reesfsd");
+                    instance.envelope = envelope;
                     String message = new String(body, "UTF-8");
                      
                     try
@@ -340,27 +346,7 @@ public class consumer
                     //exit error may not be a parser exception
                     catch (Exception e)
                     {
-                        // TODO Auto-generated catch block
-                        try
-                        {
-                            File file = new File(log_token+"_"+".exitlog");
-
-                            
-                            if (!file.exists()) {
-                                file.createNewFile();
-                            }
-                             
-                            FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
-
-                            PrintStream ps=new PrintStream(file);
-                            e.printStackTrace(ps);
-                            ps.close();
-
-                        } catch (IOException e1) {
-                            System.out.println("this is error for logging the memory leakage: ");
-                            e1.printStackTrace();
-                        }
-
+                        e.printStackTrace(); 
                     }
                     finally
                     {  
@@ -389,8 +375,8 @@ public class consumer
         catch (java.util.concurrent.TimeoutException TOE)
         {
         	TOE.printStackTrace();
-        	System.exit(1);
         	instance.log.error("RabbitMQ Timeout exception");
+        	System.exit(1);
         }
     }
     private static void doWork(int num_proc,int num_docs,final String log_token,boolean flush) throws Exception {
@@ -404,6 +390,7 @@ public class consumer
             String id= UUID.randomUUID().toString();
             instance.log.debug(log_token+": "+id+" Standord Thread started");
             instance.batch_timer.start();
+            instance.idle_timer.reset();
             ArrayList<Annotation> tempArraylist= new ArrayList<Annotation>();
             instance.queue.drainTo(tempArraylist);
             if(tempArraylist.size()>0)
@@ -423,7 +410,7 @@ public class consumer
                             doc_out.put("doc_id", doc_id);
                             JSONArray sen_array= new JSONArray();
                             instance.current_processing_doc_id = mongo_id;
-                            System.out.println("Processing"+instance.current_processing_doc_id);
+                            //System.out.println("Processing"+instance.current_processing_doc_id);
                             instance.log.debug(doc_id+": PARSING");
                             List<CoreMap> sentences = arg0.get(SentencesAnnotation.class);
                             Integer sen_id=0;
@@ -451,7 +438,7 @@ public class consumer
                                 if(stmt.executeUpdate()==1)
                                 {
                                     instance.last_processed_doc_id = mongo_id;
-                                    System.out.println("Processed: "+mongo_id);
+                                    //System.out.println("Processed: "+mongo_id);
                                 	instance.log.debug(log_token+": "+ ++instance.docs_inserted+": Successfully inserted");
                                     instance.io_operation++;
                                 }
@@ -483,6 +470,7 @@ public class consumer
             tempArraylist.clear();
             instance.docs_parsed=0;
             instance.log.debug(log_token+": "+id+" Stanford Thread completed");
+            instance.idle_timer.start();
         }
     }
 }
