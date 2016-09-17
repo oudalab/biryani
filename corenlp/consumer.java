@@ -1,5 +1,6 @@
 import com.google.common.base.Stopwatch;
 import com.rabbitmq.client.*;
+
 import edu.stanford.nlp.ling.CoreAnnotations;
 import edu.stanford.nlp.ling.CoreAnnotations.SentencesAnnotation;
 import edu.stanford.nlp.pipeline.Annotation;
@@ -7,11 +8,13 @@ import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
+
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+
 import java.io.*;
 import java.net.ConnectException;
 import java.sql.DriverManager;
@@ -53,6 +56,7 @@ public class consumer
     private int sents_parsed;
     private String current_processing_doc_id;
     private String last_processed_doc_id;
+    private Envelope envelope;
     
     static
     {
@@ -79,6 +83,7 @@ public class consumer
         instance.sents_parsed=0;    
         instance.current_processing_doc_id ="current";
         instance.last_processed_doc_id ="last";
+        instance.envelope = null;
     }
 
     public static void main(String[] argv) throws Exception
@@ -221,6 +226,12 @@ public class consumer
                 	System.out.println("last doc_id: "+last_doc);
                     if( instance.last_processed_doc_id.equals(last_doc))
                     {
+                    	try {
+							instance.channel.basicAck(instance.envelope.getDeliveryTag(), true);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
                         instance.log.error(log_token+"Taking too long for batch to execute...Restarting the container ");
                         System.exit(1);
                     }
@@ -277,7 +288,7 @@ public class consumer
                 public void handleDelivery(String consumerTag, Envelope envelope,
                                            AMQP.BasicProperties properties, byte[] body) throws IOException
                 {
-                     
+                    instance.envelope = envelope; 
                     String message = new String(body, "UTF-8");
                      
                     try
