@@ -386,6 +386,12 @@ public class consumer
             e2.printStackTrace();
             instance.log.error("Cannot connect to server, network error!");
         }
+        catch (java.util.concurrent.TimeoutException TOE)
+        {
+        	TOE.printStackTrace();
+        	System.exit(1);
+        	instance.log.error("RabbitMQ Timeout exception");
+        }
     }
     private static void doWork(int num_proc,int num_docs,final String log_token,boolean flush) throws Exception {
          
