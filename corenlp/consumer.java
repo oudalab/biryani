@@ -200,6 +200,11 @@ public class consumer
                         envArrayList.clear();
                         System.exit(1);
                     }
+                    catch (com.rabbitmq.client.AlreadyClosedException e)
+                	{
+                		instance.log.error("Rabbit Mq Connection Closed");
+                		System.exit(1);
+                	}
                     catch (IOException e)
                     {
                         e.printStackTrace();
@@ -208,6 +213,7 @@ public class consumer
                     {
                         e1.printStackTrace();
                     }
+                    
                 }
             }
         }, 0,60000);
@@ -233,11 +239,18 @@ public class consumer
                         instance.log.error(log_token+"Taking too long for batch to execute...Restarting the container ");
                         try {
 							instance.channel.basicAck(instance.envelope.getDeliveryTag(),true);
-						} catch (IOException e) {
+							System.exit(1);
+						}
+                        catch (com.rabbitmq.client.AlreadyClosedException e)
+                    	{
+                    		instance.log.error("Rabbit Mq Connection Closed");
+                    		System.exit(1);
+                    	}
+                        catch (IOException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
-                        System.exit(1);
+                        
                     }
                     else
                     {
