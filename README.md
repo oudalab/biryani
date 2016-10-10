@@ -65,11 +65,11 @@ you can find ports section in the file, just add the port you added in ```logsta
 <b>Step 8:</b>
   To run the image created
   
-  ```docker run image-name java -cp ".:"lib/*:lib/hyperic-sigar-1.6.4/sigar-bin/lib/*" consumer #threads #documents(batch size) #Log_token #Database Name ```
+  ```docker run image-name java -cp ".:"lib/*" corenlp_worker #threads #documents(batch size) #Log_token #Database Name ```
   
   <i>Note:</i> Be careful with the image name you give. If the image is not present, docker searches for the image in the dockerhub and if there an image it would download the image and run the for you.
   
-  Example: ```docker run phani\ccnlp:1.0 java -cp ".:"lib/*:lib/hyperic-sigar-1.6.4/sigar-bin/lib/*" consumer 16 200 logging test_database```
+  Example: ```docker run phani\ccnlp:1.0 java -cp ".:"lib/*" corenlp_worker 16 200 logging test_database```
 
 <b> Step 9:</b>
 Install Petrarch2<br>
