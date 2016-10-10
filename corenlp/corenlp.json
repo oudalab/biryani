@@ -1,21 +1,11 @@
 {
-       "rabbitmq": {
+        "rabbitmq": 
+        {
                 "ip":"",
                 "port":"",
                 "vhost":"",
                 "username":"",
                 "password":"",
-                "queue":"",
-                "durable":"",
-                "persistent":"" },
-
-        "mongodb": {
-                "ip":"",
-                "port":"",
-                "username":"",
-                "password":"",
-                "db":"" }
-
-
-}
-
+                "queue":""
+         }
+ }

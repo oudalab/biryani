@@ -1,7 +1,9 @@
 import org.apache.log4j.Logger;
+import org.json.simple.JSONObject;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * Created by phani on 3/18/16.
@@ -10,6 +12,7 @@ public class sqlite_reader
 {
     private Logger log=Logger.getLogger(getClass());
     private Connection c;
+    private Statement stmt;
     private PreparedStatement P_stmt;
     private ArrayList<String> mongo_id_list= new ArrayList<String>();
     public ArrayList<String> doc_present(String db_name,int size)
@@ -33,6 +36,32 @@ public class sqlite_reader
         }
         return mongo_id_list;
     }
+    
+    public boolean insert_processed_doc(String db_name, String doc_id, String pub_date, JSONObject doc_out, String mongo_id)
+    {
+    	try
+    	{
+    		Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:"+db_name+".db");
+    		P_stmt = c.prepareStatement("INSERT INTO json_test_table (id,date,output,mongo_id) VALUES (?,?,?,?)");
+            P_stmt.setString(1, doc_id.toString());
+            P_stmt.setString(2, pub_date.toString());
+            P_stmt.setString(3, doc_out.toJSONString());
+            P_stmt.setString(4, mongo_id);
+            if(P_stmt.execute())
+            {
+                return true;
+            }
+    	}
+    	catch(Exception e)
+    	{
+    		log.error("Error in inserting processed documents");
+    		e.printStackTrace();
+    	}
+    	 
+    	return false;
+    }
+    
     public boolean insert_batch_info(String db_name,String batch_id,Integer batch_size,Integer data_size,Integer sentences,Integer batch_time)
     {
         try {
@@ -60,5 +89,28 @@ public class sqlite_reader
         }
         return false;
 
+    }
+    public HashMap<String, Float> get_avg_info(String db_name)
+    {
+    	HashMap<String , Float> data= new HashMap<String, Float>();
+    	try {
+            Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:"+db_name+".db");
+            stmt=c.createStatement();
+            ResultSet rs=stmt.executeQuery("Select round(avg(data_size)),round(avg(batch_time)) from batch_info");
+            while(rs.next())
+            {
+            	data.put("avg_size", rs.getFloat(1));
+            	data.put("avg_time", rs.getFloat(2));
+
+            }
+        } 
+    	catch ( Exception e ) {
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            log.debug("Error with SQlite");
+
+        }
+    	
+    	return data;
     }
 }
