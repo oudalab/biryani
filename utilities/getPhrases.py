@@ -12,8 +12,19 @@ import pymongo
 from pymongo import MongoClient
 from date_formatter import date_formatter
 
-input_db='test.db'
+input_db=sys.argv[1]
+batch_size = int(sys.argv[2])
 
+#Timing details
+total_time_start=timeit.default_timer()
+batch_time_start=timeit.default_timer()
+
+host = '129.15.78.51'
+logger = logging.getLogger('python-logstash-logger')
+logger.setLevel(logging.INFO)
+logger.addHandler(logstash.TCPLogstashHandler(host,5000, version=1))
+
+logger.info('Petrarch started.............')
 f = open('/dev/null', 'w')
 sys.stdout = f
 config = petrarch2.utilities._get_data('data/config/', 'PETR_config.ini')
@@ -25,19 +36,34 @@ client = MongoClient()
 db=client.test_database
 db_phrases = db.phrases
 
+#sqlite
+conn2 = sqlite3.connect(input_db+'_petrarch.db')
+c2=conn2.cursor()
+c2.execute('''CREATE TABLE IF NOT EXISTS petrarch_table (doc_id varchar,phrases varchar,mongo_id varchar)''')
+total_corenlp_rows=0
 #Sqlite connections
 conn = sqlite3.connect(input_db)
 c = conn.cursor()
+c3 = conn.cursor()
 try:
-    c.execute("SELECT id,date,output,mongo_id FROM json_test_table")
+    rows = c.execute("SELECT id,date,output,mongo_id FROM json_test_table")
+    total_rows = c3.execute("SELECT max(rowid) from json_test_table")
 except:
-    py_logger.error("Input database error");
+    logger.error("Input database error");
     exit(1);
 
-rows= c.fetchall()
+#rows= c.fetchall()
+for data in total_rows:
+	total_corenlp_rows= data[0]
+logger.info('Total Rows to be processed: '+str(total_corenlp_rows))
 
+inserted_rows=0
+output=[]
+if(total_corenlp_rows< batch_size):
+        batch_size = total_corenlp_rows
 for row in rows:
     phrases_output=[]
+    article_id=row[0]
     date=date_formatter(row[1])
     doc_id=row[3]
     corenlpJsonData=json.loads(row[2])
@@ -51,7 +77,7 @@ for row in rows:
         parsed=utilities._format_parsed_str(sentenceTree)
         dict = {doc_id: {u'sents': {sentenceId: {u'content': sentenceData, u'parsed': parsed}}, u'meta': {u'date': date.encode()}}}
         try:
-            return_dict = petrarch2.do_coding(dict, None)
+            return_dict = petrarch2.do_coding(dict)
             n = return_dict[doc_id]['meta']['verbs']['nouns']
             nouns = [i[0] for i in n]
             noun_coding = [i[1] for i in n]
@@ -68,7 +94,22 @@ for row in rows:
                        "noun_coding": noun_coding,
                        "verbs": verbs,
                        "verb_coding": verb_coding}
-        print phrase_dict
-        sen_phrases_dict={sentenceData: phrase_dict}
+	sen_phrases_dict={sentenceData: phrase_dict}
         phrases_output.append(sen_phrases_dict)
-    db_phrases.insert({"doc_id":doc_id,"phrases":json.dumps(phrases_output)})
+    output.append((article_id, json.dumps(phrases_output),doc_id))
+    
+    if(len(output)==batch_size):
+    	c2.executemany("""INSERT INTO petrarch_table(doc_id, phrases, mongo_id) VALUES (?,?,?)""",output)
+    	conn2.commit()
+        batch_time_end=timeit.default_timer()
+        batch_time_taken=batch_time_end-batch_time_start
+    	inserted_rows+= batch_size
+	output=[]
+        remaining_rows = total_corenlp_rows - inserted_rows
+    	logger.info('Total rows: '+str(total_corenlp_rows)+' Inserted Rows '+str(inserted_rows)+' Remaining Rows '+str(remaining_rows)+' Time Taken:'+str(batch_time_taken))
+    	if(remaining_rows<= batch_size):
+        	batch_size = remaining_rows
+        batch_time_start=timeit.default_timer()
+total_time_end=timeit.default_timer()
+total_time_taken=total_time_end - total_time_start
+logger.info('Total rows: '+str(total_corenlp_rows)+' Inserted Rows '+str(inserted_rows)+' Remaining Rows '+str(remaining_rows)+' Time Taken:'+str(total_time_taken))
