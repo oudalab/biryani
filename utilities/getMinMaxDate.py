@@ -66,7 +66,7 @@ collection = db['disk_stories_full']
 
 minDate = 99999999
 maxDate =0
-for doc in collection.find({"date_int":0}):
+for doc in collection.find():
 	doc_id = str(doc["_id"])
 	publication_date_raw= doc['publication_date_raw']
 	date=date_formatter(publication_date_raw,doc_id)
