@@ -26,16 +26,16 @@ import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class corenlp_worker {
     private final static corenlp_worker instance;
-    private Logger log = Logger.getLogger(getClass());
+    private Logger log = LogManager.getLogger("corenlp_worker");
     private String TASK_QUEUE_NAME;
     private Properties props = new Properties();
     private StanfordCoreNLP corenlp_pipeline;
@@ -65,7 +65,7 @@ public class corenlp_worker {
     private ArrayList < Annotation > annotation_documents_list = new ArrayList < Annotation > ();
 
     static {
-        instance = new corenlp_worker();
+        instance = new corenlp_worker(); 
         instance.props.setProperty("annotators", "tokenize, ssplit,pos,parse");
         instance.cores = Runtime.getRuntime().availableProcessors();
         instance.props.setProperty("threads", instance.cores.toString());
@@ -75,7 +75,8 @@ public class corenlp_worker {
     }
 
     public static void main(String[] argv) {
-        if (argv.length == 1) {
+    	
+    	if (argv.length == 1) {
             instance.threads = Integer.parseInt(argv[0]);
             instance.batch_size = 1;
             instance.log_token = "test";
@@ -148,11 +149,9 @@ public class corenlp_worker {
         }, 0, 60000);
 
         /* Confguring logger */
-        PropertyConfigurator.configure("log4j.properties");
-
 
         try {
-            FileReader reader = new FileReader("corenlp.json");
+            FileReader reader = new FileReader("C:\\Users\\Phani\\workspace\\corenlp_worker\\src\\corenlp.json");
             JSONObject jsonobject = (JSONObject) new JSONParser().parse(reader);
             JSONObject rabbit = (JSONObject) jsonobject.get("rabbitmq");
 
