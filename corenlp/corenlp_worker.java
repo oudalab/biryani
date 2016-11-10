@@ -151,7 +151,7 @@ public class corenlp_worker {
         /* Confguring logger */
 
         try {
-            FileReader reader = new FileReader("C:\\Users\\Phani\\workspace\\corenlp_worker\\src\\corenlp.json");
+            FileReader reader = new FileReader("corenlp.json");
             JSONObject jsonobject = (JSONObject) new JSONParser().parse(reader);
             JSONObject rabbit = (JSONObject) jsonobject.get("rabbitmq");
 
