@@ -1,4 +1,5 @@
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.json.simple.JSONObject;
 
 import java.sql.*;
@@ -10,7 +11,7 @@ import java.util.HashMap;
  */
 public class sqlite_reader
 {
-    private Logger log=Logger.getLogger(getClass());
+	private Logger log = LogManager.getLogger("corenlp_worker");
     private Connection c;
     private Statement stmt;
     private PreparedStatement P_stmt;
