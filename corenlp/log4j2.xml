@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration status="WARN">
+  <appenders>
+    <Console name="Console" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+    </Console>
+
+    <File name="MyFile" fileName="logs/app.log">
+        <PatternLayout pattern="%d{yyyy-mm-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+    </File> 
+    
+    <Socket name="socket" host="logstash server host" port="5000">
+      <PatternLayout pattern="%d{yyyy-mm-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+    </Socket>
+                
+  </appenders>
+
+  <loggers>     
+    <root level="debug">
+      <appender-ref ref="Console" level="ALL"/>
+       <appender-ref ref="socket" level="ALL"/>
+    </root>    
+  </loggers>
+</configuration>
