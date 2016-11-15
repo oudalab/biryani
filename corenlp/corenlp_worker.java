@@ -255,8 +255,16 @@ public class corenlp_worker {
 
                         if (instance.annotation_documents_list.size() == instance.batch_size)
                             doWork(instance.annotation_documents_list, instance.threads);
-                    } finally {
-                        if (ack_count % instance.batch_size == 0) {
+                    }
+                    catch (Exception e)
+                    {
+                    	instance.log.debug(getExceptionSting(e));
+                    	System.exit(1);
+                    }
+                    finally 
+                    {
+                        if (ack_count % instance.batch_size == 0) 
+                        {
                             //System.out.println("Sending Acknowledgement");
                             instance.channel.basicAck(instance.envelope.getDeliveryTag(), true);
                         }
@@ -271,20 +279,28 @@ public class corenlp_worker {
         } catch (TimeoutException TOE) {
             instance.log.error(getExceptionSting(TOE));
             TOE.printStackTrace();
+            System.exit(1);
         } catch (IOException IO) {
             instance.log.error(getExceptionSting(IO));
             IO.printStackTrace();
+            System.exit(1);
         } catch (ClassNotFoundException CNE) {
             instance.log.error(instance.log_token + ":" + getExceptionSting(CNE));
             CNE.printStackTrace();
+            System.exit(1);
         } catch (SQLException SQLE) {
             instance.log.error(instance.log_token + ":" + getExceptionSting(SQLE));
             SQLE.printStackTrace();
+            System.exit(1);
         } catch (ParseException PE) {
             instance.log.error(instance.log_token + ":" + getExceptionSting(PE));
             PE.printStackTrace();
+            System.exit(1);
+        }catch (Exception e){
+        	instance.log.error(instance.log_token + ":" + getExceptionSting(e));
+            e.printStackTrace();
+            System.exit(1);
         }
-
     }
 
     private static void doWork(ArrayList < Annotation > annotaion_documents_list, int num_threads) {
