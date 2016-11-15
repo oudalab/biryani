@@ -347,7 +347,7 @@ public class corenlp_worker {
             }
         });
         instance.stats.insert_data("stats", String.valueOf(instance.threads), String.valueOf(num_docs), String.valueOf(instance.batch_data_bytes), String.valueOf(instance.sents_parsed), String.valueOf(instance.io_operation), String.valueOf(instance.batch_timer.elapsed(TimeUnit.SECONDS)));
-        instance.log.debug(instance.log_token + " #Documents:" + instance.total_docs_processed + ":Processed::Time:" + instance.total_timer);
+        instance.log.debug(instance.log_token + "#Documents:" + instance.total_docs_processed + ":Processed::Time:" + instance.total_timer);
         instance.annotation_documents_list.clear();
         instance.sents_parsed = 0;
         instance.batch_data_bytes = 0;
