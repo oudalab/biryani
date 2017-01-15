@@ -28,10 +28,9 @@ Go to ```biryani/corenlp/``` folder, you can find ```corenlp.json``` and ```log4
 ```corenlp.json``` file contains the RabbitMq server configuration information and queue name in which the documents are present<br>
 Make sure you make neccessary changes to the ```corenlp.json``` file according to how you setup your RabbitMQ server and Queue name<br>
 
-```log4j.properties``` file containes the logging configuration details. Make the necessary changes for the ip address and port you want to use for logging.<br>
+```log4j.xml``` file containes the logging configuration details. Make the necessary changes for the ip address and port you want to use for logging.<br>
 ```
-log4j.appender.S.port= port number
-log4j.appender.S.remoteHost= server address for logging
+<Socket name="socket" host="logstash server host" port="5000">
 ```
 
 <b> Step 6:</b>
@@ -46,7 +45,7 @@ add the following code below the tcp in ```logstash.conf``` file
 ```
 log4j 
 {
-  port => the port number you added in log4j.properties file
+  port => the port number you added in log4j.xml file
 }
 ```
 <i>Note:</i> Make sure that you add the port number in the ```docker-compose.yml``` file of the root directory.<br>
@@ -82,14 +81,14 @@ pip install git+https://github.com/openeventdata/petrarch2.git
 <b> Step 10: </b>
 Extracting phrases from corenlp parsed tree and storing them in mongodb<br>
 
-Once the container has parsed all the documents copy the database file to ```biryani/test/``` directory<br>
-In the directory you can find ```getPhrases.py``` file. Open the file and make changes to the following two lines of code
+Once the container has parsed all the documents copy the database file to ```biryani/utilities/``` directory<br>
+In the directory you can find ```getPhrases_threads.py```. Run the following command
 ```
-input_db='Name of the database given while running the corenlp image created
+python getPhrases_threads.py corenlp_databasefile.db # documents to be processed per batch  #threads
 ```
-Edit the db and db_phrases according to your mongodb database and to which collection you want to store the phrases.
+Example
 ```
-client = MongoClient()
-db=client.test_database
-db_phrases = db.phrases
+python getPhrases_threads.py test_database.db 5000 16
 ```
+
+The extarcted phrases are stored in ```test_database_petrarch.db```
