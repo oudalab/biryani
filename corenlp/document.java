@@ -48,9 +48,10 @@ public class document
 		{
 			JSONParser json_parser = new JSONParser();
 			JSONObject json = (JSONObject) json_parser.parse(json_document);
-			String doc_id= (String)json.get("doc_id");
+			String doc_id= (String) json.get("doc_id");
             String article_body=(String) json.get("article_body");
-            String pub_date=(String) json.get("publication_date_raw");
+            JSONObject json_date = (JSONObject) json.get("publication_date");
+            String pub_date = String.valueOf(json_date.get("$date"));
             String mongo_id_json_str=json.get("_id").toString();
             JSONObject mongo_id_json_obj= (JSONObject) json_parser.parse(mongo_id_json_str);
             String mongo_id= (String) mongo_id_json_obj.get("$oid");
