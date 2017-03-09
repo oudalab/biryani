@@ -155,10 +155,7 @@ public class corenlp_worker
     static 
     {
         instance = new corenlp_worker();
-	String data = System.getProperty("sun.java.command");
-    	String log_cmd =data.split(" ")[3];
-	instance.log.debug("PIPELINEERROR"+log_cmd+" CONTAINER STARTED");
-        instance.props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref,sentiment");
+	instance.props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref,sentiment");
         instance.cores = Runtime.getRuntime().availableProcessors();
         //instance.props.setProperty("threads", instance.cores.toString());
         instance.props.setProperty("parse.model", "edu/stanford/nlp/models/srparser/englishSR.ser.gz");
