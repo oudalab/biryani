@@ -9,7 +9,7 @@
         <PatternLayout pattern="%d{yyyy-mm-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
     </File> 
     
-    <Socket name="socket" host="logstash server host" port="5000">
+    <Socket name="socket" host="129.15.78.182" port="5037">
       <PatternLayout pattern="%d{yyyy-mm-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
     </Socket>
                 
