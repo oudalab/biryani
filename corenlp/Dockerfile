@@ -28,3 +28,4 @@ RUN wget http://nlp.stanford.edu/software/stanford-corenlp-full-2016-10-30.zip &
      rm -r rabbitmq-java-client-bin-3.6.0/ && \
      rm -r apache-log4j-2.8.1-bin/
 RUN  javac -cp "lib/*" batch_info.java stats.java sqlite_reader.java document.java corenlp_worker.java
+
