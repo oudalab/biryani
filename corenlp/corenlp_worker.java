@@ -59,13 +59,13 @@ import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.util.CoreMap;
 public class corenlp_worker 
 {
-	//Stanford Corenlp Variables
+    // Stanford Corenlp Variables
     private final static corenlp_worker instance;
     private Properties props = new Properties();
     private StanfordCoreNLP corenlp_pipeline;
     private ArrayList < Annotation > annotation_documents_list = new ArrayList < Annotation > ();
     
-    //Pipeline Variables 
+    // Pipeline Variables 
     private int batch_size;
     private int threads;
     private String db_name;
@@ -78,30 +78,30 @@ public class corenlp_worker
     private String previous_processed_doc = "previous";
     private String current_processed_doc = "current";
     
-    //logging variables
+    // logging variables
     private Logger log = LogManager.getLogger("corenlp_worker");
     private String log_token;
     
-    //rabbitmq variables
+    // rabbitmq variables
     private String TASK_QUEUE_NAME;
     private Channel channel;
     private Envelope envelope;
     private DefaultConsumer consumer;
     
-    //Sqlitedb and checking for duplicate records if container restarts varaibales
+    // Sqlitedb and checking for duplicate records if container restarts varaibales
     
     private java.sql.Connection c;
     private stats stats;
     private ArrayList < String > mongo_array_list = new ArrayList < String > ();
     
-    //timing information for total pipeline
+    // timing information for total pipeline
     private Stopwatch batch_timer = Stopwatch.createUnstarted();
     private Stopwatch total_timer = Stopwatch.createStarted();
     private int previous_batch_time = 0;
     private int batch_data_bytes = 0;
     private int io_operation = 0;
     
-    //timing information for batch
+    // timing information for batch
     private Stopwatch rabbitmq_time = Stopwatch.createUnstarted();
     private Stopwatch startup_time = Stopwatch.createStarted();
     private int tokens_per_batch = 0;
@@ -124,10 +124,10 @@ public class corenlp_worker
     private long insertion_time =0;
     private long json_object_time = 0;
     
-    //Timer for checking different cases
+    // Timer for checking different cases
     private Timer timer = new Timer();
     
-    //Adaptive batch
+    // Adaptive batch
     private boolean prediction = false;
     private long predicted_time = 0;
     private boolean batch_size_inc = true;
@@ -136,22 +136,9 @@ public class corenlp_worker
     private int thread_variator = 4;
     private String consumer_tag= UUID.randomUUID().toString();
     private String pipeline_id= UUID.randomUUID().toString();
-    
-    /*
-    // Kalman Filter
-    private double Z = 0;  // Observations in this case our docs size in a batch
-    private double Q = 1*Math.pow(10,-5);   
-    private double xhat = 0.0; // a posteri estimate of x
-    private double P = 1; //  posteri error estimate 
-    private double K = 0.0; // gain or blending factor
-    private double R = Math.pow(0.1, 5); // Change R to see the effect
-    private int kalam_docs_size = Integer.MAX_VALUE;
-    private int max_batch_size = Integer.MAX_VALUE;
-    */
-	
-	private ArrayList<Integer> docs_sizes_batch = new ArrayList<>();
+     
+    private ArrayList<Integer> docs_sizes_batch = new ArrayList<>();
    
-    
     static 
     {
         instance = new corenlp_worker();
@@ -220,10 +207,7 @@ public class corenlp_worker
         }
    
         instance.stats = new stats(instance.db_name);
-        //instance.log.debug("PIPELINEERROR"+instance.log_token+"Container Started");
-        
-        //instance.max_batch_size = instance.batch_size;
-        
+         
         instance.timer.schedule(new TimerTask() 
        	{
             @Override
@@ -234,21 +218,7 @@ public class corenlp_worker
                 System.out.println((int) instance.batch_timer.elapsed(TimeUnit.SECONDS));
                 System.out.println("Pipeline status:" + instance.is_pipeline_active);
                 
-                // CASE 1:
-                //
-                //
-                
-                /*if (instance.previous_batch_time > 0 && instance.is_pipeline_active) 
-                {
-                    System.out.println(instance.previous_batch_time);
-                    if ((int) instance.batch_timer.elapsed(TimeUnit.SECONDS) > 2 * instance.previous_batch_time) 
-                    {
-                        instance.log.debug(instance.log_token + " " + "Taking So long to Process! Restating the container");
-                        System.exit(1);
-                    }
-                }*/
-                
-                // CASE 2: Consider the situation where total documents to process are 900 and batch size is 500. According to logic in the program we are starting the
+                // CASE 1: Consider the situation where total documents to process are 900 and batch size is 500. According to logic in the program we are starting the
                 // Stanford corenlp pipeline once we reach batch size documents i.e 500. For the second run we have only 400 documents (900-500). So if we check if pipeline status
                 // is false and are there any documents present to be processed.
                 
@@ -353,11 +323,6 @@ public class corenlp_worker
                 instance.restart_status = data[0].split(":")[1];
                 instance.batch_size = Integer.parseInt(data[1].split(":")[1]);
                 instance.threads = Integer.parseInt(data[2].split(":")[1]);
-                //instance.xhat = Double.parseDouble(data[3].split(":")[1]);
-                //instance.P = Double.parseDouble(data[4].split(":")[1]);
-                //instance.K = Double.parseDouble(data[5].split(":")[1]);
-                //instance.max_batch_size = instance.batch_size;
-
                 System.out.println(instance.restart_status);
                 System.out.println("Last batch Size:"+instance.batch_size);
                 System.out.println("Last Thread Size:"+instance.threads);
@@ -435,8 +400,7 @@ public class corenlp_worker
                             			instance.batch_data_bytes += doc_size;
                             			
                             			instance.docs_sizes_batch.add(doc_size);
-                            			//System.out.println(document.getMongo_id());
-                            			//System.out.println(instance.batch_data_bytes);
+                            			 
                             			ack_count++;
                             		}
                             	}
@@ -448,60 +412,19 @@ public class corenlp_worker
                         	{
                         		if(document.getArticle_body().getBytes("UTF-8")!=null)
                         		{
-                        			instance.annotation_documents_list.add(getAnnotation(document));
-									
+                        			instance.annotation_documents_list.add(getAnnotation(document));			
                         			int doc_size = document.getArticle_body().getBytes("UTF-8").length;
-                            		instance.batch_data_bytes += doc_size;
-                            			
-                            		instance.docs_sizes_batch.add(doc_size);
-                        			//System.out.println(document.getMongo_id());
-                        			//System.out.println(instance.batch_data_bytes);
-                        			
+                            			instance.batch_data_bytes += doc_size;
+                            			instance.docs_sizes_batch.add(doc_size);
                         			ack_count++;
                         		}
                         	}
                         }
                         
-                        //if (instance.annotation_documents_list.size() == instance.batch_size)
                         if (instance.annotation_documents_list.size() == instance.batch_size)
                         { 
-				/*
-                        	instance.batch_size = instance.annotation_documents_list.size();
-                        	File restart_file = new File("restart_status.txt");
-                            restart_file.createNewFile();
-                            FileWriter fw = new FileWriter(restart_file.getAbsoluteFile());
-                            BufferedWriter bw = new BufferedWriter(fw);
-                            bw.write(instance.log_token);
-                            bw.write(":restarted::batchSize:"+instance.batch_size+"::threads:"+instance.threads);
-                            bw.close();
-				*/
-                            
-			    /*
-                            //code for dynamic batch and threads
-                            
-                        	System.out.println("Normal Pipeline");
-                        	System.out.println("Checking for "+instance.threads+" Threds and "+instance.batch_size+" BatchSize");
-                        	System.out.println("Current doc Size "+instance.batch_data_bytes);
-                        	batch_info bi = instance.stats.getAvgTime(instance.db_name);
-                        	if (bi.avgTimeTaken > 0)
-                        	{
-                        		System.out.println("Avg Doc Size "+bi.avgDocSize);
-                        		System.out.println("Avg Time" +bi.avgTimeTaken);
-                        		
-                        		instance.prediction = true;
-                        		instance.predicted_time = (bi.avgTimeTaken * instance.batch_data_bytes) / bi.avgDocSize;
-                        		System.out.println("Predicted Time "+instance.predicted_time);
-                        	}
-                        	else
-                        	{
-                        		System.out.println("No Previous Information Found");
-                        		instance.prediction = false;
-                        	}
-                        	
-			      */
-                        	instance.channel.basicCancel(instance.consumer_tag);
-	
-                        	doWork(instance.annotation_documents_list, instance.threads);
+				instance.channel.basicCancel(instance.consumer_tag);
+				doWork(instance.annotation_documents_list, instance.threads);
                         }
                         
                     }//end of try block
@@ -771,69 +694,7 @@ public class corenlp_worker
          
         }); // end of annotate pipeline method
         
-        //System.out.println(instance.corenlp_pipeline.timingInformation());
-        
-       /* Long actual_batch_time = instance.batch_timer.elapsed(TimeUnit.NANOSECONDS);
-        System.out.println("Predicted Time "+instance.predicted_time);
-        System.out.println("Actual Time "+actual_batch_time);
-        
-        HashMap<String, Double> Kalman_values = kalman_filter(instance.xhat, instance.P, instance.Q, instance.R, instance.K, actual_batch_time);
-        
-        instance.xhat = Kalman_values.get("xhat");
-        instance.P = Kalman_values.get("P");
-        instance.K = Kalman_values.get("K");
-        
-        String kalman_time = BigDecimal.valueOf(instance.xhat).toPlainString();
-        
-        instance.kalam_docs_size = kalman_datasize(instance.xhat, actual_batch_time, instance.batch_data_bytes);
-        System.out.println("Kalman Values:"+ kalman_time);
-        
-        System.out.println("Prev docs size "+instance.batch_data_bytes);
-        System.out.println("new docs Size "+instance.kalam_docs_size);
-        
-        */
-        
-        
-        /*
-        try
-        {
-        
-        	if(instance.prediction && instance.predicted_time > 0)
-            {
-            	if(actual_batch_time <= instance.predicted_time)
-                {
-                	System.out.println("Increase ");
-                	if(instance.batch_size_inc)
-                		instance.batch_size+= instance.batch_variator;
-                	if(instance.thread_size_inc)
-                		instance.threads+=instance.thread_variator;
-                	 
-                }
-                else
-                {
-                	System.out.println("Decrease");
-                	if(instance.batch_size_inc)
-                	{
-                		instance.batch_size-= instance.batch_variator;
-                		if(instance.batch_size < instance.batch_variator)
-                			instance.batch_size+=instance.batch_variator;
-                	}
-                	if(instance.thread_size_inc)
-                	{
-                		instance.threads-=instance.thread_variator;
-                		if(instance.threads<instance.cores)
-                			instance.threads = instance.cores;
-                	}
-                }
-            }
-        }
-        
-        catch (Exception e) 
-        {
-			e.printStackTrace();
-		}
-        */
-        
+         
         instance.log.debug(instance.log_token +"Pipeline_Timining "+instance.corenlp_pipeline.timingInformation().toString().trim().replaceAll("\n", ""));
           
         	instance.stats.insert_data
@@ -870,37 +731,35 @@ public class corenlp_worker
         			String.valueOf(instance.insertion_time),
         			String.valueOf(instance.json_object_time),
         			String.valueOf(instance.startup_time.elapsed(TimeUnit.NANOSECONDS)),
-					String.valueOf(min_doc_size),
+				String.valueOf(min_doc_size),
         			String.valueOf(max_doc_size),
         			String.valueOf(mean_doc_size)
         			
         	);
         	
-        	instance.batch_data_bytes = 0;
-        	instance.sentences_per_batch=0;
-            instance.tokens_per_batch = 0;
-            instance.lemmas_per_batch=0;
-            instance.ners_per_batch=0;
-            instance.parses_per_batch=0;
-            instance.dcorefs_per_batch=0;
-            instance.sentiments_per_batch=0;
-            instance.dependencies_per_batch =0 ;
-            instance.io_operation = 0;
+       	instance.batch_data_bytes = 0;
+       	instance.sentences_per_batch=0;
+       	instance.tokens_per_batch = 0;
+       	instance.lemmas_per_batch=0;
+       	instance.ners_per_batch=0;
+       	instance.parses_per_batch=0;
+       	instance.dcorefs_per_batch=0;
+       	instance.sentiments_per_batch=0;
+        instance.dependencies_per_batch =0 ;
+        instance.io_operation = 0;
              
-            instance.tokenize_time = 0;
-			instance.ssplit_time = 0;
-			instance.dependency_time = 0;
-			instance.lemma_time = 0;
-			instance.ner_time = 0;
-			instance.parse_time = 0;
-			instance.dcoref_time = 0;
-			instance.sentiment_time = 0; 
-			instance.insertion_time = 0;
-			instance.json_object_time = 0;
-			instance.rabbitmq_time.reset();
+        instance.tokenize_time = 0;
+	instance.ssplit_time = 0;
+	instance.dependency_time = 0;
+	instance.lemma_time = 0;
+	instance.ner_time = 0;
+	instance.parse_time = 0;
+	instance.dcoref_time = 0;
+	instance.sentiment_time = 0; 
+	instance.insertion_time = 0;
+	instance.json_object_time = 0;
+	instance.rabbitmq_time.reset();
 			
-			//instance.max_batch_size = Integer.MAX_VALUE;
-           
         instance.annotation_documents_list.clear();
         instance.is_pipeline_active = false;
         instance.previous_batch_time = (int) instance.batch_timer.elapsed(TimeUnit.SECONDS);
@@ -923,26 +782,20 @@ public class corenlp_worker
     	
     	try 
     	{
-    		//instance.channel.basicConsume(instance.TASK_QUEUE_NAME, false, instance.consumer_tag,instance.consumer);
     		System.out.println("Sending Ack");
-			instance.channel.basicAck(instance.envelope.getDeliveryTag(), true);
-			
-			//instance.channel.basicCancel(instance.consumer_tag);
-			instance.consumer_tag= UUID.randomUUID().toString();
+		instance.channel.basicAck(instance.envelope.getDeliveryTag(), true);
+		instance.consumer_tag= UUID.randomUUID().toString();
         	instance.channel.basicQos(0);
         	instance.channel.basicConsume(instance.TASK_QUEUE_NAME, false, instance.consumer_tag,instance.consumer);
         	System.out.println("New consumer Created");
 		} 
     	catch (Exception e) 
-    	{
-			// TODO Auto-generated catch block
+    	{	
     		e.printStackTrace();
-			instance.log.error(instance.log_token + "Failed to send acknowledgement");
-			System.exit(0);
-		}
-    	
-        //System.exit(1);
-	
+		instance.log.error(instance.log_token + "Failed to send acknowledgement");
+		System.exit(0);
+	}
+    
     }// end of dowork method
     
     public static Annotation getAnnotation(document document)
