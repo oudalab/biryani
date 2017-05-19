@@ -164,7 +164,38 @@ public class stats
 			Class.forName("org.sqlite.JDBC");
 			c = DriverManager.getConnection("jdbc:sqlite:"+db_name+"_stats.db");
 			PreparedStatement P_stmt;
-	        P_stmt= c.prepareStatement("SELECT AVG(timeTaken),AVG(docsSize) FROM stats_table");
+	        P_stmt= c.prepareStatement("SELECT AVG(batchTimeTaken),AVG(docsSize) FROM stats_table");
+	       
+	        ResultSet rs = P_stmt.executeQuery();
+	        while(rs.next())
+	        {
+	        	bi.avgTimeTaken = rs.getLong(1);
+	        	bi.avgDocSize = rs.getLong(2);
+	        }
+	        
+			return  bi;
+		} 
+		catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return bi;
+        
+	}
+	
+	public batch_info getAvgTime(String db_name,String pipelineId)
+	{
+		batch_info bi = new batch_info();
+		try 
+		{
+			bi.avgTimeTaken =-1;
+			bi.avgDocSize =-1;
+			
+			Class.forName("org.sqlite.JDBC");
+			c = DriverManager.getConnection("jdbc:sqlite:"+db_name+"_stats.db");
+			PreparedStatement P_stmt;
+	        P_stmt= c.prepareStatement("SELECT AVG(batchTimeTaken),AVG(docsSize) FROM stats_table where pipeline_id=?");
+	        P_stmt.setString(1, pipelineId);
 	       
 	        ResultSet rs = P_stmt.executeQuery();
 	        while(rs.next())
