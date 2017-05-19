@@ -49,16 +49,17 @@ public class document
 			JSONParser json_parser = new JSONParser();
 			JSONObject json = (JSONObject) json_parser.parse(json_document);
 			String doc_id= (String) json.get("doc_id");
-            		String article_body=(String) json.get("article_body");
-            		JSONObject json_date = (JSONObject) json.get("publication_date");
-            		String pub_date = String.valueOf(json_date.get("$date"));
-            		String mongo_id_json_str=json.get("_id").toString();
-            		JSONObject mongo_id_json_obj= (JSONObject) json_parser.parse(mongo_id_json_str);
-            		String mongo_id= (String) mongo_id_json_obj.get("$oid");
-			setDoc_id(doc_id);
-			setArticle_body(article_body);
-			setPubclication_date(pub_date);
-			setMongo_id(mongo_id);
+            String article_body=(String) json.get("article_body");
+            JSONObject json_date = (JSONObject) json.get("publication_date");
+            String pub_date = String.valueOf(json_date.get("$date"));
+            String mongo_id_json_str=doc_id;
+            //JSONObject mongo_id_json_obj= (JSONObject) json_parser.parse(mongo_id_json_str);
+            String mongo_id= doc_id;
+            
+            setDoc_id(doc_id);
+            setArticle_body(article_body);
+            setPubclication_date(pub_date);
+            setMongo_id(mongo_id);
 		} 
 		catch (ParseException e) 
 		{
@@ -67,3 +68,4 @@ public class document
 		}
 	}
 }
+
