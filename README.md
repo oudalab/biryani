@@ -11,6 +11,15 @@
 <b>Step 3:</b>
   Install RabbitMQ
   
+ <b>Step 4: </b>
+   Choosing Brach
+   
+   master brach is the ligth weight version of biryani which has only specified annotators()
+   
+   If you want to run biryani will all annotators refer to brach All-Annotators
+   
+   If you want to run biryani will all annotators and also dynamically decide how many documents to be processed using kalman filter refer to brach kalman_filter_all_anno
+  
 <b>Step 4: </b>
   Sending documents to the RabbitMQ queue
   
