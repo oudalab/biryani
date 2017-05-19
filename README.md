@@ -14,13 +14,13 @@
  <b>Step 4: </b>
    Choosing Brach
    
-   master brach is the ligth weight version of biryani which has only specified annotators()
+   master brach is the ligth weight version of biryani which has only specified annotators(annotators, tokenize, ssplit, pos, parse)
    
    If you want to run biryani will all annotators refer to brach All-Annotators
    
    If you want to run biryani will all annotators and also dynamically decide how many documents to be processed using kalman filter refer to brach kalman_filter_all_anno
   
-<b>Step 4: </b>
+<b>Step 5: </b>
   Sending documents to the RabbitMQ queue
   
   Download the local copy of the biryani repo. Open the file ```producer.py``` and make the necessary changes according to how 
@@ -29,7 +29,7 @@
   Once the changes to the ```producer.py```  are complete run the file using the following command
   ```python producer.py```
 
-<b>Step 5:</b>
+<b>Step 6:</b>
 Making changes to corenlp.json and log4j.properties files
 
 Go to ```biryani/corenlp/``` folder, you can find ```corenlp.json``` and ```log4j.properties``` files<br>
@@ -42,7 +42,7 @@ Make sure you make neccessary changes to the ```corenlp.json``` file according t
 <Socket name="socket" host="logstash server host" port="5000">
 ```
 
-<b> Step 6:</b>
+<b> Step 7:</b>
 docker-elk<br>
 Download the docker-elk repo from <br>
 https://github.com/deviantony/docker-elk
@@ -60,7 +60,7 @@ log4j
 <i>Note:</i> Make sure that you add the port number in the ```docker-compose.yml``` file of the root directory.<br>
 you can find ports section in the file, just add the port you added in ```logstash.conf``` here.
 
-<b>Step 7:</b>
+<b>Step 8:</b>
   
   Go to the folder corenlp and run the following command.
   
@@ -70,7 +70,7 @@ you can find ports section in the file, just add the port you added in ```logsta
   
   Example: ``` docker build -t phani\ccnlp:1.0 . ```
   
-<b>Step 8:</b>
+<b>Step 9:</b>
   To run the image created
   
   ```docker run image-name java -cp ".:"lib/*" corenlp_worker #threads #documents(batch size) #Log_token #Database Name ```
@@ -79,7 +79,7 @@ you can find ports section in the file, just add the port you added in ```logsta
   
   Example: ```docker run phani\ccnlp:1.0 java -cp ".:"lib/*" corenlp_worker 16 200 logging test_database```
 
-<b> Step 9:</b>
+<b> Step 10:</b>
 Install Petrarch2<br>
 
 Install petrarch2 by using the following command.<br>
@@ -87,7 +87,7 @@ Install petrarch2 by using the following command.<br>
 pip install git+https://github.com/openeventdata/petrarch2.git
 ```
 
-<b> Step 10: </b>
+<b> Step 11: </b>
 Extracting phrases from corenlp parsed tree and storing them in mongodb<br>
 
 Once the container has parsed all the documents copy the database file to ```biryani/utilities/``` directory<br>
