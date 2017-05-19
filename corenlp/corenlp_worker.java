@@ -1,3 +1,4 @@
+// Kalman Filter
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -123,19 +124,20 @@ public class corenlp_worker
     private long sentiment_time =0;
     private long insertion_time =0;
     private long json_object_time = 0;
+    private int min_doc_size=0;
+    private int max_doc_size=0;
+    private double mean_doc_size=0;
     
     //Timer for checking different cases
     private Timer timer = new Timer();
     
     //Adaptive batch
-    private boolean prediction = false;
-    private long predicted_time = 0;
-    private boolean batch_size_inc = true;
-    private boolean thread_size_inc = false;
-    private int batch_variator = 10;
-    private int thread_variator = 4;
     private String consumer_tag= UUID.randomUUID().toString();
     private String pipeline_id= UUID.randomUUID().toString();
+    
+    private int pipeline_slow_down_counter = 3;
+	private int current_pipeline_slow_down_counter = 0;
+
     
     // Kalman Filter
     private double Z = 0;  // Observations in this case our docs size in a batch
@@ -143,17 +145,18 @@ public class corenlp_worker
     private double xhat = 0.0; // a posteri estimate of x
     private double P = 1; //  posteri error estimate 
     private double K = 0.0; // gain or blending factor
-    private double R = Math.pow(0.1,5.0); // Change R to see the effect
+    private double R = Math.pow(0.1,1.5); // Change R to see the effect
     private int kalam_docs_size = Integer.MAX_VALUE;
     private int max_batch_size = Integer.MAX_VALUE;
     
+    private String kalman_time ="";
+    
     private ArrayList<Integer> docs_sizes_batch = new ArrayList<>();
    
-    
     static 
     {
         instance = new corenlp_worker();
-	instance.props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref,sentiment");
+	    instance.props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref,sentiment");
         instance.cores = Runtime.getRuntime().availableProcessors();
         //instance.props.setProperty("threads", instance.cores.toString());
         instance.props.setProperty("parse.model", "edu/stanford/nlp/models/srparser/englishSR.ser.gz");
@@ -216,6 +219,7 @@ public class corenlp_worker
             instance.db_name = "test";
             instance.total_batch_size = instance.batch_size;
         }
+        
         instance.stats = new stats(instance.db_name);
         
         instance.max_batch_size = instance.batch_size;
@@ -230,60 +234,30 @@ public class corenlp_worker
                 System.out.println((int) instance.batch_timer.elapsed(TimeUnit.SECONDS));
                 System.out.println("Pipeline status:" + instance.is_pipeline_active);
                 
-                // CASE 1:
-                //
-                //
-                
-                /*if (instance.previous_batch_time > 0 && instance.is_pipeline_active) 
-                {
-                    System.out.println(instance.previous_batch_time);
-                    if ((int) instance.batch_timer.elapsed(TimeUnit.SECONDS) > 2 * instance.previous_batch_time) 
-                    {
-                        instance.log.debug(instance.log_token + " " + "Taking So long to Process! Restating the container");
-                        System.exit(1);
-                    }
-                }*/
-                
-                // CASE 2: Consider the situation where total documents to process are 900 and batch size is 500. According to logic in the program we are starting the
+                // CASE 1: Consider the situation where total documents to process are 900 and batch size is 500. According to logic in the program we are starting the
                 // Stanford corenlp pipeline once we reach batch size documents i.e 500. For the second run we have only 400 documents (900-500). So if we check if pipeline status
                 // is false and are there any documents present to be processed.
                 
                 if (!instance.is_pipeline_active && instance.annotation_documents_list.size() > 0) 
                 {
                    
-                    try 
-                    {
-                    	System.out.println("Checking for "+instance.threads+" Threds and "+instance.annotation_documents_list.size()+" BatchSize");
-                    	System.out.println("Current doc Size "+instance.batch_data_bytes);
-                    	
-                    	batch_info bi = instance.stats.getAvgTime(instance.db_name);
-                    	if (bi.avgTimeTaken > 0)
-                    	{
-                    		System.out.println("Avg Doc Size "+bi.avgDocSize);
-                    		System.out.println("Avg Time" +bi.avgTimeTaken);
-                    		
-                    		instance.prediction = true;
-                    		instance.predicted_time = (bi.avgTimeTaken * instance.batch_data_bytes) / bi.avgDocSize;
-                    		System.out.println("Predicted Time "+instance.predicted_time);
-                    	}
-                    	else
-                    	{
-                    		System.out.println("No Previous Information Found");
-                    		instance.prediction = false;
-                    	}
-                    	
-                    	instance.log.debug(instance.log_token + " " + "Processing remaining Documents");
-                    	doWork(instance.annotation_documents_list, instance.threads);                    	
-                        
-                         
-                    } 
+                	try 
+					{
+						if(instance.channel!= null && instance.TASK_QUEUE_NAME!="" && instance.channel.consumerCount(instance.TASK_QUEUE_NAME) > 0)
+						{
+							System.out.println("Checking for "+instance.threads+" Threds and "+instance.annotation_documents_list.size()+" BatchSize");
+							 
+							instance.log.debug(instance.log_token + " " + "Processing remaining Documents");
+							doWork(instance.annotation_documents_list, instance.threads);     
+						}
+					} 
                     catch (Exception e) 
                     {
                         instance.log.error(getExceptionSting(e));
                     }
                 }
                 
-                // CASE 3: 
+                // CASE 2: 
                 //
                 //
                 
@@ -291,6 +265,44 @@ public class corenlp_worker
                 {
                     try 
                     {
+                    	instance.stats.insert_data
+        	        	(
+        	        			instance.pipeline_id,
+        	        			instance.db_name,
+        	        			String.valueOf( instance.threads),
+        	        			String.valueOf(instance.batch_docs_processed),
+        	        			String.valueOf(instance.total_docs_processed),
+        	        			
+        	        			String.valueOf(instance.batch_data_bytes),
+        	        			String.valueOf(instance.sentences_per_batch),
+        	        			String.valueOf(instance.tokens_per_batch),
+        	        			String.valueOf(instance.lemmas_per_batch),
+        	        			String.valueOf(instance.ners_per_batch),
+        	        			String.valueOf(instance.parses_per_batch),
+        	        			String.valueOf(instance.dcorefs_per_batch),
+        	        			String.valueOf(instance.sentiments_per_batch),
+        	        			String.valueOf(instance.dependencies_per_batch), 
+        	        			String.valueOf(instance.io_operation),
+        	
+        	        			String.valueOf(instance.batch_timer.elapsed(TimeUnit.NANOSECONDS)),
+        	        			String.valueOf(instance.kalman_time),
+        	        			String.valueOf(instance.total_timer.elapsed(TimeUnit.NANOSECONDS)),
+        	        			String.valueOf(instance.rabbitmq_time.elapsed(TimeUnit.NANOSECONDS)),        			
+        	        			String.valueOf(instance.tokenize_time),
+        	        			String.valueOf(instance.ssplit_time),
+        	        			String.valueOf(instance.dependency_time),
+        	        			String.valueOf(instance.lemma_time),
+        	        			String.valueOf(instance.ner_time),
+        	        			String.valueOf(instance.parse_time),
+        	        			String.valueOf(instance.dcoref_time),
+        	        			String.valueOf(instance.sentiment_time),
+        	        			String.valueOf(instance.insertion_time),
+        	        			String.valueOf(instance.json_object_time),
+        	        			String.valueOf(instance.startup_time.elapsed(TimeUnit.NANOSECONDS)),
+        	        			String.valueOf(instance.min_doc_size),
+        	        			String.valueOf(instance.max_doc_size),
+        	        			String.valueOf(instance.mean_doc_size)
+        	        	);
                     	
                         instance.log.debug(instance.log_token + " " + "Pipeline is stuck! Restarting container");
                         instance.channel.basicAck(instance.envelope.getDeliveryTag(), true);
@@ -349,7 +361,7 @@ public class corenlp_worker
                 instance.restart_status = data[0].split(":")[1];
                 instance.batch_size = Integer.parseInt(data[1].split(":")[1]);
                 instance.threads = Integer.parseInt(data[2].split(":")[1]);
-		instance.xhat = Double.parseDouble(data[3].split(":")[1]);
+                instance.xhat = Double.parseDouble(data[3].split(":")[1]);
                 instance.P = Double.parseDouble(data[4].split(":")[1]);
                 instance.K = Double.parseDouble(data[5].split(":")[1]);
 	
@@ -378,7 +390,8 @@ public class corenlp_worker
             instance.channel.addShutdownListener(new ShutdownListener() 
             {
 
-                public void shutdownCompleted(ShutdownSignalException arg0) 
+                @Override
+				public void shutdownCompleted(ShutdownSignalException arg0) 
                 {
                     instance.log.error("Rabbitmq Connection Closed... Restarting the container");
                     System.exit(1);
@@ -462,43 +475,11 @@ public class corenlp_worker
                         //if (instance.annotation_documents_list.size() == instance.batch_size)
                         if (instance.batch_data_bytes >= instance.kalam_docs_size || instance.annotation_documents_list.size() == instance.max_batch_size)
                         { 
-				/*
-                        	instance.batch_size = instance.annotation_documents_list.size();
-                        	File restart_file = new File("restart_status.txt");
-                            restart_file.createNewFile();
-                            FileWriter fw = new FileWriter(restart_file.getAbsoluteFile());
-                            BufferedWriter bw = new BufferedWriter(fw);
-                            bw.write(instance.log_token);
-                            bw.write(":restarted::batchSize:"+instance.batch_size+"::threads:"+instance.threads);
-                            bw.close();
-				*/
-                            
-			    /*
-                            //code for dynamic batch and threads
-                            
-                        	System.out.println("Normal Pipeline");
-                        	System.out.println("Checking for "+instance.threads+" Threds and "+instance.batch_size+" BatchSize");
-                        	System.out.println("Current doc Size "+instance.batch_data_bytes);
-                        	batch_info bi = instance.stats.getAvgTime(instance.db_name);
-                        	if (bi.avgTimeTaken > 0)
-                        	{
-                        		System.out.println("Avg Doc Size "+bi.avgDocSize);
-                        		System.out.println("Avg Time" +bi.avgTimeTaken);
-                        		
-                        		instance.prediction = true;
-                        		instance.predicted_time = (bi.avgTimeTaken * instance.batch_data_bytes) / bi.avgDocSize;
-                        		System.out.println("Predicted Time "+instance.predicted_time);
-                        	}
-                        	else
-                        	{
-                        		System.out.println("No Previous Information Found");
-                        		instance.prediction = false;
-                        	}
-                        	
-			      */
+				 
                         	instance.channel.basicCancel(instance.consumer_tag);
 	
                         	doWork(instance.annotation_documents_list, instance.threads);
+                        	
                         }
                         
                     }//end of try block
@@ -560,382 +541,358 @@ public class corenlp_worker
 
     private static void doWork(ArrayList < Annotation > annotaion_documents_list, int num_threads) 
     {
-	if(instance.rabbitmq_time.isRunning())
-    		instance.rabbitmq_time.stop();
-	
-	int min_doc_size = Collections.min(instance.docs_sizes_batch);
-	int max_doc_size = Collections.max(instance.docs_sizes_batch);
-	double mean_doc_size = instance.docs_sizes_batch.stream().mapToInt(val -> val).average().getAsDouble();
-	
-	instance.docs_sizes_batch.clear();
-
-	instance.batch_size = annotaion_documents_list.size();
-	try
-	{ 
-        	File restart_file = new File("restart_status.txt");
-		restart_file.createNewFile();
-       		FileWriter fw = new FileWriter(restart_file.getAbsoluteFile());
-        	BufferedWriter bw = new BufferedWriter(fw);
-        	bw.write(instance.log_token);
-		bw.write(":restarted::batchSize:"+instance.batch_size+"::threads:"+instance.threads+"::xhat:"+instance.xhat+"::P:"+instance.P+"::K:"+instance.K);
-        	bw.close();
-	}
-	catch (Exception e)
-        {
-            instance.log.error(instance.log_token + ":" + getExceptionSting(e));
-            e.printStackTrace();
-        }   
-    	
-    	int num_docs = annotaion_documents_list.size();
-        System.out.println(instance.batch_size + " " + num_threads);
-        
-        instance.log.debug(instance.log_token + " Started pipeline with #Threads:" + num_threads + " #Batch_size:" + num_docs);
-        instance.is_pipeline_active = true;
-        instance.batch_timer.start();
-        instance.corenlp_pipeline.annotate(annotaion_documents_list, num_threads, new Consumer < Annotation > () 
-        {
-        	
-            public void accept(Annotation anno) 
-            {
-            	Stopwatch tokenize_timer = Stopwatch.createUnstarted();
-            	Stopwatch ssplit_timer = Stopwatch.createUnstarted();
-            	Stopwatch dependency_timer = Stopwatch.createUnstarted();
-            	Stopwatch lemma_timer = Stopwatch.createUnstarted();
-            	Stopwatch ner_timer = Stopwatch.createUnstarted();
-            	Stopwatch parse_timer = Stopwatch.createUnstarted();
-            	Stopwatch dcoref_timer = Stopwatch.createUnstarted();
-            	Stopwatch sentiment_timer = Stopwatch.createUnstarted();
-            	Stopwatch insertion_timer = Stopwatch.createUnstarted();
-            	Stopwatch json_object_timer = Stopwatch.createUnstarted();
-            	
-                String doc_id = anno.get(CoreAnnotations.DocIDAnnotation.class);
-                String pub_date = anno.get(CoreAnnotations.DocDateAnnotation.class);
-                String mongo_id = anno.get(CoreAnnotations.DocTitleAnnotation.class);
-
-                instance.log.debug(doc_id + ": PARSING");
-                instance.current_processed_doc = mongo_id;
-                instance.log.debug(instance.log_token + " Processed:" + mongo_id);
-                
-                json_object_timer.start();
-                JSONObject doc_out = new JSONObject();; // main object
-                doc_out.put("doc_id", doc_id);
-                JSONArray sen_array = new JSONArray();
-                json_object_timer.stop();
-
-           
-                ssplit_timer.start();
-                List <CoreMap> sentences = new ArrayList<CoreMap>();
-                sentences = anno.get(SentencesAnnotation.class);
-                ssplit_timer.stop();
-                
-                instance.sentences_per_batch = instance.sentences_per_batch + sentences.size();
-                instance.total_sentences_processed = instance.total_sentences_processed + instance.sentences_per_batch;
-                
-                Integer sen_id = 0;
-                 
-                ArrayList < String > tokens = new ArrayList < String > ();
-                ArrayList < String > lemmas = new ArrayList < String > ();
-                ArrayList < String > ners = new ArrayList < String > ();
-
-                for (CoreMap sentence: sentences) 
-                {
-                    for (CoreLabel token: sentence.get(TokensAnnotation.class)) 
-                    {
-
-                        // this is the text of the token
-                    	tokenize_timer.start();
-                        String word = token.get(TextAnnotation.class);
-                        tokens.add(word);
-                        tokenize_timer.stop();
-
-                        //this is the text of the the lemma
-                        lemma_timer.start();
-                        String lemma = token.get(LemmaAnnotation.class);
-                        lemmas.add(lemma);
-                        lemma_timer.stop();
-
-                        // this is the POS tag of the token
-                        //String pos = token.get(PartOfSpeechAnnotation.class);
-
-                        // this is the NER label of the token
-                        ner_timer.start();
-                        String ner = token.get(NamedEntityTagAnnotation.class);
-                        ners.add(ner);
-                        ner_timer.stop();
-
-                    }
-
-                    instance.tokens_per_batch = instance.tokens_per_batch + tokens.size();
-                    instance.lemmas_per_batch = instance.lemmas_per_batch + lemmas.size();
-                    instance.ners_per_batch = instance.ners_per_batch + ners.size();
-                    
-                    parse_timer.start();
-                    Tree tree = sentence.get(TreeAnnotation.class);
-                    parse_timer.stop();
-                    instance.parses_per_batch++;
-                     
-                    sentiment_timer.start();
-                    String sentiment = sentence.get(SentimentCoreAnnotations.SentimentClass.class);
-                    sentiment_timer.stop();
-                    instance.sentiments_per_batch++;
-                    
-                    dependency_timer.start();
-                    String dependencies = sentence.get(SemanticGraphCoreAnnotations.BasicDependenciesAnnotation.class).toString(SemanticGraph.OutputFormat.LIST);
-                    dependency_timer.stop();
-                    instance.dependencies_per_batch++;
-
-                    //System.out.println(sentiment);
-                    json_object_timer.start();
-                    JSONObject sen_obj = new JSONObject(); // sentence object;
-                    sen_obj.put("sentence_id", (++sen_id).toString());
-                    sen_obj.put("sentence", sentence.toString());
-                    sen_obj.put("parse_sentence", tree.toString());
-                    sen_obj.put("dependency_tree", dependencies.toString());
-                    sen_obj.put("token", tokens.toString());
-                    sen_obj.put("lemma", lemmas.toString());
-                    sen_obj.put("ner", ners.toString());
-                    sen_obj.put("sentiment", sentiment.toString());
-                    sen_array.add(sen_obj);
-                    json_object_timer.stop();
-                }
-                
-                dcoref_timer.start();
-                ArrayList < String > corefs = new ArrayList < String > ();
-                Map < Integer, CorefChain > corefChains = anno.get(CorefCoreAnnotations.CorefChainAnnotation.class);
-                for (Map.Entry < Integer, CorefChain > entry: corefChains.entrySet()) 
-                {
-                    corefs.add(entry.getValue().toString());
-                }
-
-                doc_out.put("sentences", sen_array);
-                if (corefChains != null)
-                {
-                    doc_out.put("coref", corefs.toString());
-                    instance.dcorefs_per_batch = instance.dcorefs_per_batch + corefs.size();
-                }
-                else
-                {
-                    doc_out.put("coref", "");
-                    instance.dcorefs_per_batch = instance.dcorefs_per_batch;
-                }
-                dcoref_timer.stop();
-                instance.log.debug(doc_id + ": PARSED");
-                 
-                
-                insertion_timer.start();
-                try 
-                {
-                    PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id,date,output,mongo_id) VALUES (?,?,?,?)");
-                    stmt.setString(1, doc_id.toString());
-                    stmt.setString(2, pub_date.toString());
-                    stmt.setString(3, doc_out.toJSONString());
-                    stmt.setString(4, mongo_id);
-
-                    if (stmt.executeUpdate() == 1) 
-                    {
-                        instance.io_operation++;
-                        instance.total_docs_processed++;
-                        instance.batch_docs_processed++;
-                        instance.log.debug(instance.log_token + ":" + instance.total_docs_processed + " Inserted"+"Batch Size "+instance.batch_size);
-                    } 
-                    else 
-                    {
-                        instance.log.error(instance.log_token + "ERROR in inserting document");
-                    }
-
-                } 
-                catch (SQLException e) 
-                {
-                    e.printStackTrace();
-                    instance.log.error(instance.log_token + "Exception in inserting documents");
-                }
-                insertion_timer.stop();
-                
-                
-                //storing all timing information
-                instance.tokenize_time = instance.tokenize_time+tokenize_timer.elapsed(TimeUnit.NANOSECONDS);
-                instance.ssplit_time = instance.ssplit_time+ ssplit_timer.elapsed(TimeUnit.NANOSECONDS);
-                instance.dependency_time = instance.dependency_time+ dependency_timer.elapsed(TimeUnit.NANOSECONDS);
-                instance.lemma_time = instance.lemma_time+ lemma_timer.elapsed(TimeUnit.NANOSECONDS);
-                instance.ner_time = instance.ner_time+ ner_timer.elapsed(TimeUnit.NANOSECONDS);
-                instance.parse_time = instance.parse_time+ parse_timer.elapsed(TimeUnit.NANOSECONDS);
-                instance.dcoref_time = instance.dcoref_time+ dcoref_timer.elapsed(TimeUnit.NANOSECONDS);
-                instance.sentiment_time = instance.sentiment_time+ sentiment_timer.elapsed(TimeUnit.NANOSECONDS);
-                instance.insertion_time = instance.insertion_time+ insertion_timer.elapsed(TimeUnit.NANOSECONDS);
-                instance.json_object_time = instance.json_object_time+ json_object_timer.elapsed(TimeUnit.NANOSECONDS);
-                
-            }// end of accept annotation
-         
-        }); // end of annotate pipeline method
-        
-        //System.out.println(instance.corenlp_pipeline.timingInformation());
-        
-        Long actual_batch_time = instance.batch_timer.elapsed(TimeUnit.NANOSECONDS);
-        System.out.println("Predicted Time "+instance.predicted_time);
-        System.out.println("Actual Time "+actual_batch_time);
-        
-        HashMap<String, Double> Kalman_values = kalman_filter(instance.xhat, instance.P, instance.Q, instance.R, instance.K, actual_batch_time);
-        
-        instance.xhat = Kalman_values.get("xhat");
-        instance.P = Kalman_values.get("P");
-        instance.K = Kalman_values.get("K");
-        
-        String kalman_time = BigDecimal.valueOf(instance.xhat).toPlainString();
-        
-        instance.kalam_docs_size = kalman_datasize(instance.xhat, actual_batch_time, instance.batch_data_bytes);
-        System.out.println("Kalman Values:"+ kalman_time);
-        
-        System.out.println("Prev docs size "+instance.batch_data_bytes);
-        System.out.println("new docs Size "+instance.kalam_docs_size);
-        
-        
-        /*
-        try
-        {
-        
-        	if(instance.prediction && instance.predicted_time > 0)
-            {
-            	if(actual_batch_time <= instance.predicted_time)
-                {
-                	System.out.println("Increase ");
-                	if(instance.batch_size_inc)
-                		instance.batch_size+= instance.batch_variator;
-                	if(instance.thread_size_inc)
-                		instance.threads+=instance.thread_variator;
-                	 
-                }
-                else
-                {
-                	System.out.println("Decrease");
-                	if(instance.batch_size_inc)
-                	{
-                		instance.batch_size-= instance.batch_variator;
-                		if(instance.batch_size < instance.batch_variator)
-                			instance.batch_size+=instance.batch_variator;
-                	}
-                	if(instance.thread_size_inc)
-                	{
-                		instance.threads-=instance.thread_variator;
-                		if(instance.threads<instance.cores)
-                			instance.threads = instance.cores;
-                	}
-                }
-            }
-        }
-        
-        catch (Exception e) 
-        {
+		if(instance.rabbitmq_time.isRunning())
+	    		instance.rabbitmq_time.stop();
+		
+		instance.min_doc_size = Collections.min(instance.docs_sizes_batch);
+		instance.max_doc_size = Collections.max(instance.docs_sizes_batch);
+		instance.mean_doc_size = instance.docs_sizes_batch.stream().mapToInt(val -> val).average().getAsDouble();
+		instance.docs_sizes_batch.clear();
+		instance.batch_size = annotaion_documents_list.size();
+		
+		batch_info avg_data = instance.stats.getAvgTime(instance.db_name,instance.pipeline_id);
+		System.out.println("Average/3::"+ avg_data.avgDocSize/3);
+		System.out.println("Batch data bytes"+instance.batch_data_bytes);
+		if(instance.batch_data_bytes < avg_data.avgDocSize/3)
+		{
+			if(++instance.current_pipeline_slow_down_counter >= instance.pipeline_slow_down_counter)
+			{
+				instance.log.debug(instance.log_token+" Pipeline is slowing down... Restarting the container");
+				System.exit(0);
+			}
+		}
+		else
+		{
+			if(instance.current_pipeline_slow_down_counter > 0)
+				instance.current_pipeline_slow_down_counter--;
+		}
+		
+		try
+		{ 
+	        File restart_file = new File("restart_status.txt");
+			restart_file.createNewFile();
+	       	FileWriter fw = new FileWriter(restart_file.getAbsoluteFile());
+	        BufferedWriter bw = new BufferedWriter(fw);
+	        bw.write(instance.log_token);
+			bw.write(":restarted::batchSize:"+instance.batch_size+"::threads:"+instance.threads+"::xhat:"+instance.xhat+"::P:"+instance.P+"::K:"+instance.K);
+	        bw.close();
+		}
+		catch (Exception e)
+	    {
+			instance.log.error(instance.log_token + ":" + getExceptionSting(e));
 			e.printStackTrace();
-		}
-        */
-        
-        instance.log.debug(instance.log_token +"Pipeline_Timining "+instance.corenlp_pipeline.timingInformation().toString().trim().replaceAll("\n", ""));
-          
-        	instance.stats.insert_data
-        	(
-        			instance.pipeline_id,
-        			instance.db_name,
-        			String.valueOf( num_threads),
-        			String.valueOf(num_docs),
-        			String.valueOf(instance.total_docs_processed),
-        			
-        			String.valueOf(instance.batch_data_bytes),
-        			String.valueOf(instance.sentences_per_batch),
-        			String.valueOf(instance.tokens_per_batch),
-        			String.valueOf(instance.lemmas_per_batch),
-        			String.valueOf(instance.ners_per_batch),
-        			String.valueOf(instance.parses_per_batch),
-        			String.valueOf(instance.dcorefs_per_batch),
-        			String.valueOf(instance.sentiments_per_batch),
-        			String.valueOf(instance.dependencies_per_batch), 
-        			String.valueOf(instance.io_operation),
-
-        			String.valueOf(instance.batch_timer.elapsed(TimeUnit.NANOSECONDS)),
-        			String.valueOf(kalman_time),
-        			String.valueOf(instance.total_timer.elapsed(TimeUnit.NANOSECONDS)),
-        			String.valueOf(instance.rabbitmq_time.elapsed(TimeUnit.NANOSECONDS)),        			
-        			String.valueOf(instance.tokenize_time),
-        			String.valueOf(instance.ssplit_time),
-        			String.valueOf(instance.dependency_time),
-        			String.valueOf(instance.lemma_time),
-        			String.valueOf(instance.ner_time),
-        			String.valueOf(instance.parse_time),
-        			String.valueOf(instance.dcoref_time),
-        			String.valueOf(instance.sentiment_time),
-        			String.valueOf(instance.insertion_time),
-        			String.valueOf(instance.json_object_time),
-        			String.valueOf(instance.startup_time.elapsed(TimeUnit.NANOSECONDS)),
-        			String.valueOf(min_doc_size),
-        			String.valueOf(max_doc_size),
-        			String.valueOf(mean_doc_size)
-        	);
-        	
-        	instance.batch_data_bytes = 0;
-        	instance.sentences_per_batch=0;
-            instance.tokens_per_batch = 0;
-            instance.lemmas_per_batch=0;
-            instance.ners_per_batch=0;
-            instance.parses_per_batch=0;
-            instance.dcorefs_per_batch=0;
-            instance.sentiments_per_batch=0;
-            instance.dependencies_per_batch =0 ;
-            instance.io_operation = 0;
-             
-            instance.tokenize_time = 0;
-			instance.ssplit_time = 0;
-			instance.dependency_time = 0;
-			instance.lemma_time = 0;
-			instance.ner_time = 0;
-			instance.parse_time = 0;
-			instance.dcoref_time = 0;
-			instance.sentiment_time = 0; 
-			instance.insertion_time = 0;
-			instance.json_object_time = 0;
-			instance.rabbitmq_time.reset();
-			
-			instance.max_batch_size = Integer.MAX_VALUE;
-           
-        instance.annotation_documents_list.clear();
-        instance.is_pipeline_active = false;
-        instance.previous_batch_time = (int) instance.batch_timer.elapsed(TimeUnit.SECONDS);
-        instance.log.debug(instance.log_token + "#Documents:" + instance.total_docs_processed +"#Sentences:"+instance.total_sentences_processed +":Processed::Time:" + instance.total_timer);
-        instance.batch_timer.stop();
-        instance.batch_timer.reset();
-        System.out.println("Batch Timer Stopped");
-        
-
-        
-        if (instance.batch_docs_processed % num_docs != 0) 
-        {
-            instance.log.debug(instance.log_token + ":Document is stuck... Restart container");
-            System.exit(1);
-        }
-        instance.batch_docs_processed = 0;
-        
-        System.out.println("New Batch Size: "+instance.batch_size);
-    	System.out.println("New Thread Size: "+instance.threads);
-    	
-    	try 
-    	{
-    		//instance.channel.basicConsume(instance.TASK_QUEUE_NAME, false, instance.consumer_tag,instance.consumer);
-    		System.out.println("Sending Ack");
-			instance.channel.basicAck(instance.envelope.getDeliveryTag(), true);
-			
-			//instance.channel.basicCancel(instance.consumer_tag);
-			instance.consumer_tag= UUID.randomUUID().toString();
-        	instance.channel.basicQos(0);
-        	instance.channel.basicConsume(instance.TASK_QUEUE_NAME, false, instance.consumer_tag,instance.consumer);
-        	System.out.println("New consumer Created");
-		} 
-    	catch (Exception e) 
-    	{
-			// TODO Auto-generated catch block
-    		e.printStackTrace();
-			instance.log.error(instance.log_token + "Failed to send acknowledgement");
-			System.exit(0);
-		}
-    	
-        //System.exit(1);
+	    }   
+	    	
+	    	int num_docs = annotaion_documents_list.size();
+	        System.out.println(instance.batch_size + " " + num_threads);
+	        
+	        instance.log.debug(instance.log_token + " Started pipeline with #Threads:" + num_threads + " #Batch_size:" + num_docs);
+	        instance.is_pipeline_active = true;
+	        instance.batch_timer.start();
+	        instance.corenlp_pipeline.annotate(annotaion_documents_list, num_threads, new Consumer < Annotation > () 
+	        {
+	        	
+	            @Override
+				public void accept(Annotation anno) 
+	            {
+	            	Stopwatch tokenize_timer = Stopwatch.createUnstarted();
+	            	Stopwatch ssplit_timer = Stopwatch.createUnstarted();
+	            	Stopwatch dependency_timer = Stopwatch.createUnstarted();
+	            	Stopwatch lemma_timer = Stopwatch.createUnstarted();
+	            	Stopwatch ner_timer = Stopwatch.createUnstarted();
+	            	Stopwatch parse_timer = Stopwatch.createUnstarted();
+	            	Stopwatch dcoref_timer = Stopwatch.createUnstarted();
+	            	Stopwatch sentiment_timer = Stopwatch.createUnstarted();
+	            	Stopwatch insertion_timer = Stopwatch.createUnstarted();
+	            	Stopwatch json_object_timer = Stopwatch.createUnstarted();
+	            	
+	                String doc_id = anno.get(CoreAnnotations.DocIDAnnotation.class);
+	                String pub_date = anno.get(CoreAnnotations.DocDateAnnotation.class);
+	                String mongo_id = anno.get(CoreAnnotations.DocTitleAnnotation.class);
+	
+	                instance.log.debug(doc_id + ": PARSING");
+	                instance.current_processed_doc = mongo_id;
+	                instance.log.debug(instance.log_token + " Processed:" + mongo_id);
+	                
+	                json_object_timer.start();
+	                JSONObject doc_out = new JSONObject();; // main object
+	                doc_out.put("doc_id", doc_id);
+	                JSONArray sen_array = new JSONArray();
+	                json_object_timer.stop();
+	
+	           
+	                ssplit_timer.start();
+	                List <CoreMap> sentences = new ArrayList<CoreMap>();
+	                sentences = anno.get(SentencesAnnotation.class);
+	                ssplit_timer.stop();
+	                
+	                instance.sentences_per_batch = instance.sentences_per_batch + sentences.size();
+	                instance.total_sentences_processed = instance.total_sentences_processed + instance.sentences_per_batch;
+	                
+	                Integer sen_id = 0;
+	                 
+	                ArrayList < String > tokens = new ArrayList < String > ();
+	                ArrayList < String > lemmas = new ArrayList < String > ();
+	                ArrayList < String > ners = new ArrayList < String > ();
+	
+	                for (CoreMap sentence: sentences) 
+	                {
+	                    for (CoreLabel token: sentence.get(TokensAnnotation.class)) 
+	                    {
+	
+	                        // this is the text of the token
+	                    	tokenize_timer.start();
+	                        String word = token.get(TextAnnotation.class);
+	                        tokens.add(word);
+	                        tokenize_timer.stop();
+	
+	                        //this is the text of the the lemma
+	                        lemma_timer.start();
+	                        String lemma = token.get(LemmaAnnotation.class);
+	                        lemmas.add(lemma);
+	                        lemma_timer.stop();
+	
+	                        // this is the POS tag of the token
+	                        //String pos = token.get(PartOfSpeechAnnotation.class);
+	
+	                        // this is the NER label of the token
+	                        ner_timer.start();
+	                        String ner = token.get(NamedEntityTagAnnotation.class);
+	                        ners.add(ner);
+	                        ner_timer.stop();
+	
+	                    }
+	
+	                    instance.tokens_per_batch = instance.tokens_per_batch + tokens.size();
+	                    instance.lemmas_per_batch = instance.lemmas_per_batch + lemmas.size();
+	                    instance.ners_per_batch = instance.ners_per_batch + ners.size();
+	                    
+	                    parse_timer.start();
+	                    Tree tree = sentence.get(TreeAnnotation.class);
+	                    parse_timer.stop();
+	                    instance.parses_per_batch++;
+	                     
+	                    sentiment_timer.start();
+	                    String sentiment = sentence.get(SentimentCoreAnnotations.SentimentClass.class);
+	                    sentiment_timer.stop();
+	                    instance.sentiments_per_batch++;
+	                    
+	                    dependency_timer.start();
+	                    String dependencies = sentence.get(SemanticGraphCoreAnnotations.BasicDependenciesAnnotation.class).toString(SemanticGraph.OutputFormat.LIST);
+	                    dependency_timer.stop();
+	                    instance.dependencies_per_batch++;
+	
+	                    //System.out.println(sentiment);
+	                    json_object_timer.start();
+	                    JSONObject sen_obj = new JSONObject(); // sentence object;
+	                    sen_obj.put("sentence_id", (++sen_id).toString());
+	                    sen_obj.put("sentence", sentence.toString());
+	                    sen_obj.put("parse_sentence", tree.toString());
+	                    sen_obj.put("dependency_tree", dependencies.toString());
+	                    sen_obj.put("token", tokens.toString());
+	                    sen_obj.put("lemma", lemmas.toString());
+	                    sen_obj.put("ner", ners.toString());
+	                    sen_obj.put("sentiment", sentiment.toString());
+	                    sen_array.add(sen_obj);
+	                    json_object_timer.stop();
+	                }
+	                
+	                dcoref_timer.start();
+	                ArrayList < String > corefs = new ArrayList < String > ();
+	                Map < Integer, CorefChain > corefChains = anno.get(CorefCoreAnnotations.CorefChainAnnotation.class);
+	                for (Map.Entry < Integer, CorefChain > entry: corefChains.entrySet()) 
+	                {
+	                    corefs.add(entry.getValue().toString());
+	                }
+	
+	                doc_out.put("sentences", sen_array);
+	                if (corefChains != null)
+	                {
+	                    doc_out.put("coref", corefs.toString());
+	                    instance.dcorefs_per_batch = instance.dcorefs_per_batch + corefs.size();
+	                }
+	                else
+	                {
+	                    doc_out.put("coref", "");
+	                    instance.dcorefs_per_batch = instance.dcorefs_per_batch;
+	                }
+	                dcoref_timer.stop();
+	                instance.log.debug(doc_id + ": PARSED");
+	                 
+	                
+	                insertion_timer.start();
+	                try 
+	                {
+	                    PreparedStatement stmt = instance.c.prepareStatement("INSERT INTO json_test_table (id,date,output,mongo_id) VALUES (?,?,?,?)");
+	                    stmt.setString(1, doc_id.toString());
+	                    stmt.setString(2, pub_date.toString());
+	                    stmt.setString(3, doc_out.toJSONString());
+	                    stmt.setString(4, mongo_id);
+	
+	                    if (stmt.executeUpdate() == 1) 
+	                    {
+	                        instance.io_operation++;
+	                        instance.total_docs_processed++;
+	                        instance.batch_docs_processed++;
+	                        instance.log.debug(instance.log_token + ":" + instance.total_docs_processed + " Inserted"+"Batch Size "+instance.batch_size);
+	                    } 
+	                    else 
+	                    {
+	                        instance.log.error(instance.log_token + "ERROR in inserting document");
+	                    }
+	
+	                } 
+	                catch (SQLException e) 
+	                {
+	                    e.printStackTrace();
+	                    instance.log.error(instance.log_token + "Exception in inserting documents");
+	                }
+	                insertion_timer.stop();
+	                
+	                
+	                //storing all timing information
+	                instance.tokenize_time = instance.tokenize_time+tokenize_timer.elapsed(TimeUnit.NANOSECONDS);
+	                instance.ssplit_time = instance.ssplit_time+ ssplit_timer.elapsed(TimeUnit.NANOSECONDS);
+	                instance.dependency_time = instance.dependency_time+ dependency_timer.elapsed(TimeUnit.NANOSECONDS);
+	                instance.lemma_time = instance.lemma_time+ lemma_timer.elapsed(TimeUnit.NANOSECONDS);
+	                instance.ner_time = instance.ner_time+ ner_timer.elapsed(TimeUnit.NANOSECONDS);
+	                instance.parse_time = instance.parse_time+ parse_timer.elapsed(TimeUnit.NANOSECONDS);
+	                instance.dcoref_time = instance.dcoref_time+ dcoref_timer.elapsed(TimeUnit.NANOSECONDS);
+	                instance.sentiment_time = instance.sentiment_time+ sentiment_timer.elapsed(TimeUnit.NANOSECONDS);
+	                instance.insertion_time = instance.insertion_time+ insertion_timer.elapsed(TimeUnit.NANOSECONDS);
+	                instance.json_object_time = instance.json_object_time+ json_object_timer.elapsed(TimeUnit.NANOSECONDS);
+	                
+	            }// end of accept annotation
+	         
+	        }); // end of annotate pipeline method
+	        
+	        //System.out.println(instance.corenlp_pipeline.timingInformation());
+	        
+	        Long actual_batch_time = instance.batch_timer.elapsed(TimeUnit.NANOSECONDS);
+	         
+	        
+	        HashMap<String, Double> Kalman_values = kalman_filter(instance.xhat, instance.P, instance.Q, instance.R, instance.K, actual_batch_time);
+	        
+	        instance.xhat = Kalman_values.get("xhat");
+	        instance.P = Kalman_values.get("P");
+	        instance.K = Kalman_values.get("K");
+	        
+	        instance.kalman_time = BigDecimal.valueOf(instance.xhat).toPlainString();
+	        
+	        instance.kalam_docs_size = kalman_datasize(instance.xhat, actual_batch_time, instance.batch_data_bytes);
+	        System.out.println("Kalman Values:"+ instance.kalman_time);
+	        
+	        System.out.println("Prev docs size "+instance.batch_data_bytes);
+	        System.out.println("new docs Size "+instance.kalam_docs_size);
+	         
+	        instance.log.debug(instance.log_token +"Pipeline_Timining "+instance.corenlp_pipeline.timingInformation().toString().trim().replaceAll("\n", ""));
+	          
+	        	instance.stats.insert_data
+	        	(
+	        			instance.pipeline_id,
+	        			instance.db_name,
+	        			String.valueOf( instance.threads),
+	        			String.valueOf(instance.batch_docs_processed),
+	        			String.valueOf(instance.total_docs_processed),
+	        			
+	        			String.valueOf(instance.batch_data_bytes),
+	        			String.valueOf(instance.sentences_per_batch),
+	        			String.valueOf(instance.tokens_per_batch),
+	        			String.valueOf(instance.lemmas_per_batch),
+	        			String.valueOf(instance.ners_per_batch),
+	        			String.valueOf(instance.parses_per_batch),
+	        			String.valueOf(instance.dcorefs_per_batch),
+	        			String.valueOf(instance.sentiments_per_batch),
+	        			String.valueOf(instance.dependencies_per_batch), 
+	        			String.valueOf(instance.io_operation),
+	
+	        			String.valueOf(instance.batch_timer.elapsed(TimeUnit.NANOSECONDS)),
+	        			String.valueOf(instance.kalman_time),
+	        			String.valueOf(instance.total_timer.elapsed(TimeUnit.NANOSECONDS)),
+	        			String.valueOf(instance.rabbitmq_time.elapsed(TimeUnit.NANOSECONDS)),        			
+	        			String.valueOf(instance.tokenize_time),
+	        			String.valueOf(instance.ssplit_time),
+	        			String.valueOf(instance.dependency_time),
+	        			String.valueOf(instance.lemma_time),
+	        			String.valueOf(instance.ner_time),
+	        			String.valueOf(instance.parse_time),
+	        			String.valueOf(instance.dcoref_time),
+	        			String.valueOf(instance.sentiment_time),
+	        			String.valueOf(instance.insertion_time),
+	        			String.valueOf(instance.json_object_time),
+	        			String.valueOf(instance.startup_time.elapsed(TimeUnit.NANOSECONDS)),
+	        			String.valueOf(instance.min_doc_size),
+	        			String.valueOf(instance.max_doc_size),
+	        			String.valueOf(instance.mean_doc_size)
+	        	);
+	        	
+	        	instance.batch_data_bytes = 0;
+	        	instance.sentences_per_batch=0;
+	            instance.tokens_per_batch = 0;
+	            instance.lemmas_per_batch=0;
+	            instance.ners_per_batch=0;
+	            instance.parses_per_batch=0;
+	            instance.dcorefs_per_batch=0;
+	            instance.sentiments_per_batch=0;
+	            instance.dependencies_per_batch =0 ;
+	            instance.io_operation = 0;
+	             
+	            instance.tokenize_time = 0;
+				instance.ssplit_time = 0;
+				instance.dependency_time = 0;
+				instance.lemma_time = 0;
+				instance.ner_time = 0;
+				instance.parse_time = 0;
+				instance.dcoref_time = 0;
+				instance.sentiment_time = 0; 
+				instance.insertion_time = 0;
+				instance.json_object_time = 0;
+				instance.rabbitmq_time.reset();
+				
+				instance.max_batch_size = Integer.MAX_VALUE;
+	           
+	        instance.annotation_documents_list.clear();
+	        instance.is_pipeline_active = false;
+	        instance.previous_batch_time = (int) instance.batch_timer.elapsed(TimeUnit.SECONDS);
+	        instance.log.debug(instance.log_token + "#Documents:" + instance.total_docs_processed +"#Sentences:"+instance.total_sentences_processed +":Processed::Time:" + instance.total_timer);
+	        instance.batch_timer.stop();
+	        instance.batch_timer.reset();
+	        System.out.println("Batch Timer Stopped");
+	        
+	
+	        
+	        if (instance.batch_docs_processed % num_docs != 0) 
+	        {
+	            instance.log.debug(instance.log_token + ":Document is stuck... Restart container");
+	            System.exit(1);
+	        }
+	        instance.batch_docs_processed = 0;
+	        
+	        System.out.println("New Batch Size: "+instance.batch_size);
+	    	System.out.println("New Thread Size: "+instance.threads);
+	    	
+	    	try 
+	    	{
+	    		//instance.channel.basicConsume(instance.TASK_QUEUE_NAME, false, instance.consumer_tag,instance.consumer);
+	    		System.out.println("Sending Ack");
+				instance.channel.basicAck(instance.envelope.getDeliveryTag(), true);
+				
+				//instance.channel.basicCancel(instance.consumer_tag);
+				instance.consumer_tag= UUID.randomUUID().toString();
+	        	instance.channel.basicQos(0);
+	        	instance.channel.basicConsume(instance.TASK_QUEUE_NAME, false, instance.consumer_tag,instance.consumer);
+	        	System.out.println("New consumer Created");
+			} 
+	    	catch (Exception e) 
+	    	{
+				// TODO Auto-generated catch block
+	    		e.printStackTrace();
+				instance.log.error(instance.log_token + "Failed to send acknowledgement");
+				System.exit(0);
+			}
+	    	
+	    	
+	        //System.exit(1);
 	
     }// end of dowork method
     
