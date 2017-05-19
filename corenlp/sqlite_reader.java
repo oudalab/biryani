@@ -1,10 +1,14 @@
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.HashMap;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.simple.JSONObject;
-
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.HashMap;
 
 /**
  * Created by phani on 3/18/16.
@@ -98,7 +102,7 @@ public class sqlite_reader
             Class.forName("org.sqlite.JDBC");
             c = DriverManager.getConnection("jdbc:sqlite:"+db_name+".db");
             stmt=c.createStatement();
-            ResultSet rs=stmt.executeQuery("Select round(avg(data_size)),round(avg(batch_time)) from batch_info");
+            ResultSet rs=stmt.executeQuery("Select round(avg(docsSize)),round(avg(batchTimeTaken)) from stats_table");
             while(rs.next())
             {
             	data.put("avg_size", rs.getFloat(1));
@@ -115,3 +119,4 @@ public class sqlite_reader
     	return data;
     }
 }
+
