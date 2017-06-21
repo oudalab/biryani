@@ -106,30 +106,28 @@ for row in rows:
     sen_failed=0;
     sen_parsed=0;
     for sentence in sentences:
-		sen_dump=json.dumps(sentence)
-		sen_json=json.loads(sen_dump)
-		sen_id=sen_json['sen_id'].encode()
-		sen_data=sen_json['sentence']
-		sen_parse=sen_json['tree']
-		text=sen_data
-		parse=sen_parse
-		parsed = utilities._format_parsed_str(parse)
+	    sen_dump=json.dumps(sentence)
+	    sen_json=json.loads(sen_dump)
+	    sen_id=sen_json['sen_id'].encode()
+	    sen_data=sen_json['sentence']
+	    sen_parse=sen_json['tree']
+	    text=sen_data
+	    parse=sen_parse
+	    parsed = utilities._format_parsed_str(parse)
+        try:
+            py_logger.debug('parsing : '+mongo_id)
+            dict = {mongo_id: {u'sents': {sen_id: {u'content': text, u'parsed': parsed}},u'meta': {u'date': date.encode()}}}
+            return_dict = petrarch2.do_coding(dict,None)
+            return_dict= json.dumps(return_dict)
+            #print return_dict
+            output=return_dict
+            sen_out_records.append(output)
+            sen_parsed= sen_parsed+1;
+            sent_phrases_array[text]= get_phrases('', text, parsed)
 
-                try:
-			        py_logger.debug('parsing : '+mongo_id)
-			        dict = {mongo_id: {u'sents': {sen_id: {u'content': text, u'parsed': parsed}},u'meta': {u'date': date.encode()}}}
-			        return_dict = petrarch2.do_coding(dict,None)
-			        return_dict= json.dumps(return_dict)
-			        #print return_dict
-			        output=return_dict
-			        sen_out_records.append(output)
-			        sen_parsed= sen_parsed+1;
-				sent_phrases_array[text]= get_phrases('', text, parsed)
-
-                except:
-			        sen_failed=sen_failed+1;
-			        py_logger.error('Parsing failed: '+mongo_id+' sen_id: '+sen_id)
-
+        except:
+            sen_failed=sen_failed+1;
+            py_logger.error('Parsing failed: '+mongo_id+' sen_id: '+sen_id)
 
     #print json.dumps(sent_phrases_array)
     #print error
@@ -146,9 +144,9 @@ for row in rows:
 
     if(output_records_length==batch_size):
         c2.executemany("""INSERT INTO petrarch_table(doc_id, output, mongo_id,sents_count) VALUES (?,?,?,?)""",
-                        output_records)
+                       output_records)
         c2.executemany("""INSERT INTO phrases(doc_id, mongo_id,phrases,sents_count) VALUES (?,?,?,?)""",
-                        phrases_records)
+                       phrases_records)
         conn2.commit()
         batch_time_end=timeit.default_timer()
         batch_time_taken=batch_time_end-batch_time_start
@@ -163,7 +161,7 @@ for row in rows:
         batch_time_start=timeit.default_timer()
         output_records = []
         output_tuple = ()
-	phrases_tuple=()
+	    phrases_tuple=()
     	phrases_records=[]
 c2.close()
 total_time_end=timeit.default_timer()
