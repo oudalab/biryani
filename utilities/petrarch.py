@@ -106,14 +106,14 @@ for row in rows:
     sen_failed=0;
     sen_parsed=0;
     for sentence in sentences:
-	    sen_dump=json.dumps(sentence)
-	    sen_json=json.loads(sen_dump)
-	    sen_id=sen_json['sen_id'].encode()
-	    sen_data=sen_json['sentence']
-	    sen_parse=sen_json['tree']
-	    text=sen_data
-	    parse=sen_parse
-	    parsed = utilities._format_parsed_str(parse)
+        sen_dump=json.dumps(sentence)
+        sen_json=json.loads(sen_dump)
+        sen_id=sen_json['sen_id'].encode()
+        sen_data=sen_json['sentence']
+        sen_parse=sen_json['tree']
+        text=sen_data
+        parse=sen_parse
+        parsed = utilities._format_parsed_str(parse)
         try:
             py_logger.debug('parsing : '+mongo_id)
             dict = {mongo_id: {u'sents': {sen_id: {u'content': text, u'parsed': parsed}},u'meta': {u'date': date.encode()}}}
@@ -161,8 +161,8 @@ for row in rows:
         batch_time_start=timeit.default_timer()
         output_records = []
         output_tuple = ()
-	    phrases_tuple=()
-    	phrases_records=[]
+        phrases_tuple=()
+        phrases_records=[]
 c2.close()
 total_time_end=timeit.default_timer()
 total_time_taken=total_time_end - total_time_start
