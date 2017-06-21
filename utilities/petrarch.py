@@ -27,12 +27,12 @@ def get_phrases(self, text, parse):
         try:
             verbs = return_dict['test123']['meta']['verbs']['eventtext'].values()[0]
         except KeyError:
-            print "No eventtext"
+            print("No eventtext")
             verbs = ""
         try:
             verb_coding = return_dict['test123']['meta']['verbs']['eventtext'].keys()[0][2]
         except KeyError as e:
-            print e
+            print(e)
             verb_coding = ""
         phrase_dict = {"nouns" : nouns,
                        "noun_coding" : noun_coding,
@@ -43,7 +43,7 @@ def get_phrases(self, text, parse):
 
 #f = open('/dev/null', 'w')
 #sys.stdout = f
-print sys.argv;
+print(sys.argv)
 input_db=sys.argv[1];
 output_db=sys.argv[2];
 #exit(1);
@@ -80,7 +80,7 @@ rows= c.fetchall()
 #coun
 docs_inserted=0;
 docs_present= len(rows)
-print docs_present
+print(docs_present)
 #print asad
 remaining_docs=docs_present
 batch_size=5000
